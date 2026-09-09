@@ -35,3 +35,11 @@ test("wallet mode links to /pay with the receiving wallet", async () => {
   assert.equal(url.searchParams.get("amount"), "5");
   assert.throws(() => createCoffeeLink({ wallet: "0x123", returnTo: "https://x.y" }));
 });
+
+test("createCoffeeLink carries the network when given and drops junk", async () => {
+  const { createCoffeeLink } = await import("../src/index.ts");
+  const u = new URL(createCoffeeLink({ wallet: "0x" + "ab".repeat(20), network: "celo", returnTo: "https://x.example/" }));
+  assert.equal(u.searchParams.get("network"), "celo");
+  const bad = new URL(createCoffeeLink({ wallet: "0x" + "ab".repeat(20), network: "not valid!", returnTo: "https://x.example/" }));
+  assert.equal(bad.searchParams.get("network"), null);
+});

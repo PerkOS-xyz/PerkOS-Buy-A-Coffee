@@ -3,7 +3,7 @@ import { formatUnits } from "viem";
 import { currentWallet } from "@/lib/auth";
 import { coffeesReceived, coffeesSent } from "@/lib/chain";
 import { getCreatorByWallet } from "@/lib/db";
-import { publicConfig } from "@/lib/config";
+import { explorerTx, publicConfig } from "@/lib/config";
 import DashboardForm from "./DashboardForm";
 import WidgetBuilder from "./WidgetBuilder";
 
@@ -35,32 +35,33 @@ export default async function Dashboard() {
     <main className="wrap wide">
       <div className="lbl">Dashboard</div>
       <h1>{profile?.display_name || profile?.handle || short(wallet)}</h1>
-      <p className="note">Wallet {wallet} · {cfg.networkName} · history read from the CoffeeSplit contract.</p>
+      <p className="note">Wallet {wallet} · {cfg.networks.map((n) => n.name).join(", ")} · history read from the CoffeeSplit contracts.</p>
 
       <div style={{ margin: "1rem 0 1.5rem" }}>
         <span className="stat"><b>{received.length}</b><span>coffees received</span></span>
-        <span className="stat"><b>{formatUnits(totalReceived, 6)}</b><span>USDC received (after fee)</span></span>
+        <span className="stat"><b>{formatUnits(totalReceived, 6)}</b><span>stablecoin received (after fee)</span></span>
         <span className="stat"><b>{sent.length}</b><span>coffees sent</span></span>
-        <span className="stat"><b>{formatUnits(totalSent, 6)}</b><span>USDC sent</span></span>
+        <span className="stat"><b>{formatUnits(totalSent, 6)}</b><span>stablecoin sent</span></span>
       </div>
 
       <h2>Your button</h2>
       <p className="note">Wallet mode needs no setup: coffees go straight to {short(wallet)}. Tune the button, watch the preview, copy the snippet.</p>
       <p className="note">You never pay gas and you need no other account. The 2% fee covers the facilitator's gas, so every coffee arrives in your wallet as USDC, already settled.</p>
-      <WidgetBuilder wallet={wallet} appUrl={cfg.appUrl} initialName={profile?.display_name || ""} />
+      <WidgetBuilder wallet={wallet} appUrl={cfg.appUrl} initialName={profile?.display_name || ""} networks={cfg.networks} />
 
       <h2>Coffees received</h2>
       {received.length === 0 ? <p className="note">None yet.</p> : (
         <table className="tbl">
-          <thead><tr><th>When</th><th>From</th><th>Amount</th><th>You got</th><th>Tx</th></tr></thead>
+          <thead><tr><th>When</th><th>From</th><th>Amount</th><th>You got</th><th>Network</th><th>Tx</th></tr></thead>
           <tbody>
             {received.slice(0, 50).map((c) => (
-              <tr key={c.txHash + c.nonce}>
+              <tr key={c.network + c.txHash + c.nonce}>
                 <td>{when(c.timestamp)}</td>
                 <td className="note">{short(c.from)}</td>
-                <td>{formatUnits(c.value, 6)} USDC</td>
-                <td>{formatUnits(c.value - c.fee, 6)} USDC</td>
-                <td><a href={cfg.network === "base" ? `https://basescan.org/tx/${c.txHash}` : `https://sepolia.basescan.org/tx/${c.txHash}`} target="_blank" rel="noreferrer">view</a></td>
+                <td>{formatUnits(c.value, 6)} {c.symbol}</td>
+                <td>{formatUnits(c.value - c.fee, 6)} {c.symbol}</td>
+                <td className="note">{c.network}</td>
+                <td><a href={explorerTx(c.network, c.txHash)} target="_blank" rel="noreferrer">view</a></td>
               </tr>
             ))}
           </tbody>
@@ -70,14 +71,15 @@ export default async function Dashboard() {
       <h2>Coffees sent</h2>
       {sent.length === 0 ? <p className="note">None yet.</p> : (
         <table className="tbl">
-          <thead><tr><th>When</th><th>To</th><th>Amount</th><th>Tx</th></tr></thead>
+          <thead><tr><th>When</th><th>To</th><th>Amount</th><th>Network</th><th>Tx</th></tr></thead>
           <tbody>
             {sent.slice(0, 50).map((c) => (
-              <tr key={c.txHash + c.nonce}>
+              <tr key={c.network + c.txHash + c.nonce}>
                 <td>{when(c.timestamp)}</td>
                 <td className="note">{short(c.creator)}</td>
-                <td>{formatUnits(c.value, 6)} USDC</td>
-                <td><a href={cfg.network === "base" ? `https://basescan.org/tx/${c.txHash}` : `https://sepolia.basescan.org/tx/${c.txHash}`} target="_blank" rel="noreferrer">view</a></td>
+                <td>{formatUnits(c.value, 6)} {c.symbol}</td>
+                <td className="note">{c.network}</td>
+                <td><a href={explorerTx(c.network, c.txHash)} target="_blank" rel="noreferrer">view</a></td>
               </tr>
             ))}
           </tbody>
