@@ -63,7 +63,7 @@ Env already set (production, preview, development): `APP_URL`, `NETWORK=base-sep
 
 Still needed before the first coffee:
 
-1. **Database**: create a Neon Postgres (Vercel Marketplace → Neon, or neon.tech), set `DATABASE_URL` on the project, then run `DATABASE_URL=… npm run db:migrate -w apps/web` once.
+1. **Database**: create a Neon Postgres (Vercel Marketplace → Neon, or neon.tech), set `DATABASE_URL` on the project, then run `DATABASE_URL=… npm run db:migrate -w apps/web` once. The migrations also seed the first creator, `juliomcruz` (pay-to `0xc2564e41B7F5Cb66d2d99466450CfebcE9e8228f`, allowed origins juliomcruz.xyz and github.com).
 2. **Email**: set `RESEND_API_KEY` (the key on juliomcruz-xyz is a sensitive var and cannot be copied) and a `FROM_EMAIL` on a domain verified in Resend (e.g. `Buy A Coffee <coffee@perkos.xyz>` once `perkos.xyz` is verified there).
 3. **Stack** (facilitator): merge PerkOS-xyz/Stack PR #147; `COFFEE_SPLIT_ADDRESS_BASE_SEPOLIA` is already set on the `stack` project. In the Stack dashboard create an API key, claim and verify the vendor domain `buyacoffee.perkos.xyz`, and add a `domain_whitelist` sponsor rule for it pointing at a funded sponsor wallet on Base Sepolia. Set that key here as `PERKOS_STACK_API_KEY`.
 4. **DNS**: the CNAME above.
