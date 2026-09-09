@@ -46,6 +46,7 @@ export default async function Dashboard() {
 
       <h2>Your button</h2>
       <p className="note">Wallet mode needs no setup: coffees go straight to {short(wallet)}. Tune the button, watch the preview, copy the snippet.</p>
+      <p className="note">You never pay gas and you need no other account. The 2% fee covers the facilitator's gas, so every coffee arrives in your wallet as USDC, already settled.</p>
       <WidgetBuilder wallet={wallet} appUrl={cfg.appUrl} initialName={profile?.display_name || ""} />
 
       <h2>Coffees received</h2>

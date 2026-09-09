@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getCreatorByHandle, insertCoffee } from "@/lib/db";
 import { getNetwork, MAX_USDC, MIN_USDC } from "@/lib/config";
 import { buildTypedData, coffeeNonce, usdcUnits } from "@/lib/x402";
+import { clientIp, LIMITS, rateLimit } from "@/lib/rateLimit";
 
 const addr = z.string().refine((v) => isAddress(v, { strict: false }), "invalid address");
 
@@ -26,9 +27,13 @@ const Body = z
  *    and the database is optional (the coffee row is best-effort).
  */
 export async function POST(req: Request) {
+  const ipLimit = rateLimit(`prepare:ip:${clientIp(req)}`, LIMITS.prepareIp.limit, LIMITS.prepareIp.windowMs);
+  if (!ipLimit.allowed) return NextResponse.json({ ok: false, error: "Too many requests. Try again in a minute." }, { status: 429, headers: { "Retry-After": String(ipLimit.retryAfter) } });
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false, error: "Invalid input" }, { status: 400 });
   const { handle, amount, memo, returnTo, from } = parsed.data;
+  const fromLimit = rateLimit(`prepare:from:${from.toLowerCase()}`, LIMITS.prepareFrom.limit, LIMITS.prepareFrom.windowMs);
+  if (!fromLimit.allowed) return NextResponse.json({ ok: false, error: "Too many coffees from this wallet. Try again in a minute." }, { status: 429, headers: { "Retry-After": String(fromLimit.retryAfter) } });
 
   let payTo: Address;
   let creatorId: string | null = null;

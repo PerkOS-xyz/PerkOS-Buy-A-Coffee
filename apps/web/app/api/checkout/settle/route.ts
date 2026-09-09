@@ -5,6 +5,7 @@ import { getCoffee, getCreatorById, insertCoffee, markCoffee } from "@/lib/db";
 import { APP_URL, getNetwork, FEE_BPS, MAX_USDC, MIN_USDC } from "@/lib/config";
 import { coffeeNonce, settleCoffee, usdcUnits } from "@/lib/x402";
 import { isAllowedReturnTo, withResult } from "@/lib/returnTo";
+import { clientIp, LIMITS, rateLimit } from "@/lib/rateLimit";
 
 export const maxDuration = 120;
 
@@ -28,6 +29,8 @@ const Body = z.object({
 });
 
 export async function POST(req: Request) {
+  const ipLimit = rateLimit(`settle:ip:${clientIp(req)}`, LIMITS.settleIp.limit, LIMITS.settleIp.windowMs);
+  if (!ipLimit.allowed) return NextResponse.json({ ok: false, error: "Too many requests. Try again in a minute." }, { status: 429, headers: { "Retry-After": String(ipLimit.retryAfter) } });
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false, error: "Invalid input" }, { status: 400 });
   const { coffeeId, signature, wallet } = parsed.data;
@@ -77,6 +80,9 @@ export async function POST(req: Request) {
     if (hasRow) await markCoffee(coffeeId, { status: "failed", error: "expired" }).catch(() => {});
     return NextResponse.json({ ok: false, error: "This payment window expired. Please start again." }, { status: 410 });
   }
+
+  const fromLimit = rateLimit(`settle:from:${from.toLowerCase()}`, LIMITS.settleFrom.limit, LIMITS.settleFrom.windowMs);
+  if (!fromLimit.allowed) return NextResponse.json({ ok: false, error: "Too many coffees from this wallet. Try again in a minute." }, { status: 429, headers: { "Retry-After": String(fromLimit.retryAfter) } });
 
   const authorization = {
     from,
