@@ -1,0 +1,62 @@
+# PerkOS Buy A Coffee
+
+Buy A Coffee for the x402 era. A creator gets a hosted page at `buyacoffee.perkos.xyz/{handle}`; a donor picks 5, 10, 50 or a custom amount of USDC, signs **once** in their wallet, pays no gas, and is sent back to the site they came from. The PerkOS facilitator ([Stack](https://stack.perkos.xyz)) settles through the `CoffeeSplit` contract: **98% to the creator instantly, 2% covers the facilitator's gas**. No custody, no account for donors.
+
+Design: `BUY-A-COFFEE-DESIGN.md` in the PerkOS workspace. Contract: [PerkOS-Contracts `CoffeeSplit`](https://github.com/PerkOS-xyz/PerkOS-Contracts). Facilitator route: [Stack `Docs/COFFEE_SPLIT.md`](https://github.com/PerkOS-xyz/Stack).
+
+## Layout
+
+| Path | What |
+|---|---|
+| `apps/web` | Next.js 15 service: checkout `/{handle}`, badge `/badge/{handle}.svg`, creator dashboard, API. Neon Postgres, Resend magic links, viem. |
+| `packages/widget` | `@perkos/buy-a-coffee`: script tag, React component, `createCoffeeLink()`. No web3 dependencies. |
+
+## Use it on a site
+
+```html
+<script src="https://buyacoffee.perkos.xyz/widget.js" data-handle="your-handle" data-amount="5"></script>
+```
+
+React:
+
+```tsx
+import { BuyACoffee } from "@perkos/buy-a-coffee/react";
+<BuyACoffee handle="your-handle" amount={5} onResult={(r) => console.log(r)} />
+```
+
+GitHub README:
+
+```md
+[![Buy me an x402 coffee](https://buyacoffee.perkos.xyz/badge/your-handle.svg)](https://buyacoffee.perkos.xyz/your-handle)
+```
+
+When the donor returns, the URL carries `?coffee=paid&tx=0x…&amount=5` (or `coffee=cancelled`). The widget cleans the URL and dispatches `perkos:coffee` on `window`. The checkout only redirects to origins the creator listed in the dashboard.
+
+## Flow
+
+1. `POST /api/checkout/prepare` records a `pending` coffee and returns the EIP-3009 `ReceiveWithAuthorization` typed data (`to = CoffeeSplit`, `nonce = coffeeNonce(payTo, coffeeId)`, 10-minute window).
+2. The donor signs in the browser (EIP-6963 injected wallets; chain switch to Base if needed).
+3. `POST /api/checkout/settle` calls Stack `verify` then `settle` with `paymentRequirements.extra.split`; the sponsor wallet executes `CoffeeSplit.settle(...)`. The coffee becomes `settled` with the tx hash, or `failed` with the reason.
+4. Redirect to `return_to` with the result.
+
+## Run locally
+
+```bash
+npm install
+cp apps/web/.env.example apps/web/.env   # fill DATABASE_URL, SESSION_SECRET, RESEND_API_KEY (optional locally: links print to the console)
+npm run db:migrate -w apps/web
+npm run build -w packages/widget
+npm run dev
+```
+
+`npm test` runs the pure unit tests (return_to safety, nonce/memo helpers, widget link parsing). `npm run typecheck` covers both packages.
+
+## Deploy (Vercel)
+
+Root directory `apps/web`, build command `npm run build` from the repo root (builds the widget first). Env: see `apps/web/.env.example`. Database: Neon; run `npm run db:migrate -w apps/web` with `DATABASE_URL` once per environment.
+
+Stack side: `COFFEE_SPLIT_ADDRESS_<NETWORK>` set on the facilitator, a `domain_whitelist` sponsor rule for `buyacoffee.perkos.xyz`, and an API key (`PERKOS_STACK_API_KEY` here) whose verified vendor domain is `buyacoffee.perkos.xyz`.
+
+## Not in v1
+
+Other networks and tokens, WalletConnect (injected wallets only), recurring coffees, embedded (non-redirect) checkout, fiat.
