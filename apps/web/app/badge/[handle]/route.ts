@@ -1,19 +1,26 @@
-import { countSettled, getCreatorByHandle } from "@/lib/db";
+import { isAddress } from "viem";
+import { countSettled, countSettledByWallet, getCreatorByHandle } from "@/lib/db";
 
 /** GET /badge/{handle}.svg — a README badge that links to the checkout. */
 export async function GET(_req: Request, ctx: { params: Promise<{ handle: string }> }) {
   const raw = (await ctx.params).handle;
   const handle = raw.replace(/\.svg$/i, "");
-  let c = null;
+  const walletMode = isAddress(handle, { strict: false });
+  let known = walletMode;
   let count = 0;
   try {
-    c = await getCreatorByHandle(handle);
-    if (c) count = (await countSettled(c.id)).count;
+    if (walletMode) {
+      count = (await countSettledByWallet(handle)).count;
+    } else {
+      const c = await getCreatorByHandle(handle);
+      known = !!c;
+      if (c) count = (await countSettled(c.id)).count;
+    }
   } catch (e) {
     console.error("badge: db unavailable", (e as Error).message);
   }
   const label = "Buy me an x402 coffee";
-  const right = c ? (count > 0 ? `☕ ${count}` : "☕ USDC") : "not found";
+  const right = known ? (count > 0 ? `☕ ${count}` : "☕ USDC") : "not found";
   const lw = 10 + label.length * 6.6;
   const rw = 14 + right.length * 6.6;
   const w = Math.round(lw + rw);

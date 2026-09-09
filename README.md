@@ -13,6 +13,14 @@ Design: `BUY-A-COFFEE-DESIGN.md` in the PerkOS workspace. Contract: [PerkOS-Cont
 
 ## Use it on a site
 
+Wallet mode, no account: the widget carries the receiving wallet and the service settles straight to it.
+
+```html
+<script src="https://buyacoffee.perkos.xyz/widget.js" data-wallet="0xYourWallet" data-name="Your Name" data-amount="5"></script>
+```
+
+Handle mode, with a registered creator (profile page, dashboard, automatic return to your site):
+
 ```html
 <script src="https://buyacoffee.perkos.xyz/widget.js" data-handle="your-handle" data-amount="5"></script>
 ```
@@ -21,22 +29,24 @@ React:
 
 ```tsx
 import { BuyACoffee } from "@perkos/buy-a-coffee/react";
-<BuyACoffee handle="your-handle" amount={5} onResult={(r) => console.log(r)} />
+<BuyACoffee wallet="0xYourWallet" name="Your Name" amount={5} onResult={(r) => console.log(r)} />
+// or <BuyACoffee handle="your-handle" amount={5} />
 ```
 
 GitHub README:
 
 ```md
-[![Buy me an x402 coffee](https://buyacoffee.perkos.xyz/badge/your-handle.svg)](https://buyacoffee.perkos.xyz/your-handle)
+[![Buy me an x402 coffee](https://buyacoffee.perkos.xyz/badge/0xYourWallet.svg)](https://buyacoffee.perkos.xyz/pay?to=0xYourWallet&name=Your%20Name)
+<!-- or, with a handle: /badge/your-handle.svg → /your-handle -->
 ```
 
-When the donor returns, the URL carries `?coffee=paid&tx=0x…&amount=5` (or `coffee=cancelled`). The widget cleans the URL and dispatches `perkos:coffee` on `window`. The checkout only redirects to origins the creator listed in the dashboard.
+When the donor returns, the URL carries `?coffee=paid&tx=0x…&amount=5` (or `coffee=cancelled`). The widget cleans the URL and dispatches `perkos:coffee` on `window`. In handle mode the checkout redirects automatically, but only to origins the creator listed in the dashboard; in wallet mode there is no origin list, so the donor gets a "Back to your-site" button instead (no open redirect).
 
 ## Flow
 
-1. `POST /api/checkout/prepare` records a `pending` coffee and returns the EIP-3009 `ReceiveWithAuthorization` typed data (`to = CoffeeSplit`, `nonce = coffeeNonce(payTo, coffeeId)`, 10-minute window).
+1. `POST /api/checkout/prepare` (with `handle` or `payTo`) returns the EIP-3009 `ReceiveWithAuthorization` typed data (`to = CoffeeSplit`, `nonce = coffeeNonce(payTo, coffeeId)`, 10-minute window).
 2. The donor signs in the browser (EIP-6963 injected wallets; chain switch to Base if needed).
-3. `POST /api/checkout/settle` calls Stack `verify` then `settle` with `paymentRequirements.extra.split`; the sponsor wallet executes `CoffeeSplit.settle(...)`. The coffee becomes `settled` with the tx hash, or `failed` with the reason.
+3. `POST /api/checkout/settle` re-derives the authorization server-side (the nonce binds `payTo` + `coffeeId`, so the recipient cannot be swapped), calls Stack `verify` then `settle` with `paymentRequirements.extra.split`; the sponsor wallet executes `CoffeeSplit.settle(...)`. The coffee is recorded as `settled`/`failed`; in wallet mode the database is optional (best-effort record).
 4. Redirect to `return_to` with the result.
 
 ## Run locally
@@ -63,7 +73,7 @@ Env already set (production, preview, development): `APP_URL`, `NETWORK=base-sep
 
 Still needed before the first coffee:
 
-1. **Database**: create a Neon Postgres (Vercel Marketplace → Neon, or neon.tech), set `DATABASE_URL` on the project, then run `DATABASE_URL=… npm run db:migrate -w apps/web` once.
+1. **Database**: create a Neon Postgres (Vercel Marketplace → Neon, or neon.tech), set `DATABASE_URL` on the project, then run `DATABASE_URL=… npm run db:migrate -w apps/web` once. The migrations also seed the first creator, `juliomcruz` (pay-to `0xc2564e41B7F5Cb66d2d99466450CfebcE9e8228f`, allowed origins juliomcruz.xyz and github.com).
 2. **Email**: set `RESEND_API_KEY` (the key on juliomcruz-xyz is a sensitive var and cannot be copied) and a `FROM_EMAIL` on a domain verified in Resend (e.g. `Buy A Coffee <coffee@perkos.xyz>` once `perkos.xyz` is verified there).
 3. **Stack** (facilitator): merge PerkOS-xyz/Stack PR #147; `COFFEE_SPLIT_ADDRESS_BASE_SEPOLIA` is already set on the `stack` project. In the Stack dashboard create an API key, claim and verify the vendor domain `buyacoffee.perkos.xyz`, and add a `domain_whitelist` sponsor rule for it pointing at a funded sponsor wallet on Base Sepolia. Set that key here as `PERKOS_STACK_API_KEY`.
 4. **DNS**: the CNAME above.

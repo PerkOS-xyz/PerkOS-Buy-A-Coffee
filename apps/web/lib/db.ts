@@ -20,7 +20,8 @@ export interface Creator {
 export interface Coffee {
   id: string;
   coffee_id: string;
-  creator_id: string;
+  creator_id: string | null;
+  pay_to: string | null;
   network: string;
   amount: string;
   fee: string | null;
@@ -95,7 +96,8 @@ export async function updateCreator(
 
 export async function insertCoffee(c: {
   coffee_id: string;
-  creator_id: string;
+  creator_id: string | null;
+  pay_to: string;
   network: string;
   amount: string;
   memo: string | null;
@@ -103,8 +105,9 @@ export async function insertCoffee(c: {
   from_address: string | null;
 }): Promise<Coffee> {
   const rows = (await sql()`
-    INSERT INTO coffees (coffee_id, creator_id, network, amount, memo, return_to, from_address)
-    VALUES (${c.coffee_id}, ${c.creator_id}, ${c.network}, ${c.amount}, ${c.memo}, ${c.return_to}, ${c.from_address})
+    INSERT INTO coffees (coffee_id, creator_id, pay_to, network, amount, memo, return_to, from_address)
+    VALUES (${c.coffee_id}, ${c.creator_id}, ${c.pay_to.toLowerCase()}, ${c.network}, ${c.amount}, ${c.memo}, ${c.return_to}, ${c.from_address})
+    ON CONFLICT (coffee_id) DO UPDATE SET from_address = COALESCE(EXCLUDED.from_address, coffees.from_address)
     RETURNING *`) as Coffee[];
   return rows[0];
 }
@@ -140,6 +143,13 @@ export async function countSettled(creatorId: string): Promise<{ count: number; 
   const rows = (await sql()`
     SELECT count(*)::int AS count, COALESCE(sum(amount), 0)::text AS total
     FROM coffees WHERE creator_id = ${creatorId} AND status = 'settled'`) as { count: number; total: string }[];
+  return rows[0] ?? { count: 0, total: "0" };
+}
+
+export async function countSettledByWallet(payTo: string): Promise<{ count: number; total: string }> {
+  const rows = (await sql()`
+    SELECT count(*)::int AS count, COALESCE(sum(amount), 0)::text AS total
+    FROM coffees WHERE pay_to = ${payTo.toLowerCase()} AND status = 'settled'`) as { count: number; total: string }[];
   return rows[0] ?? { count: 0, total: "0" };
 }
 

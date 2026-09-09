@@ -32,8 +32,9 @@ function discoverWallets(): Promise<Wallet[]> {
 type Step = "idle" | "connecting" | "ready" | "signing" | "settling" | "paid" | "failed";
 
 export default function Checkout(props: {
-  handle: string;
+  handle: string | null;
   payTo: string;
+  displayName?: string;
   amounts: number[];
   presetAmount: number | null;
   presetMemo: string;
@@ -53,6 +54,8 @@ export default function Checkout(props: {
   const [step, setStep] = useState<Step>("idle");
   const [error, setError] = useState<string | null>(null);
   const [tx, setTx] = useState<string | null>(null);
+  const [backTo, setBackTo] = useState<string | null>(null);
+  const who = props.displayName || props.handle || props.payTo;
 
   useEffect(() => {
     discoverWallets().then(setWallets);
@@ -104,7 +107,7 @@ export default function Checkout(props: {
       const prep = await fetch("/api/checkout/prepare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ handle: props.handle, amount: effectiveAmount, memo, returnTo: props.returnTo, from: account }),
+        body: JSON.stringify(props.handle ? { handle: props.handle, amount: effectiveAmount, memo, returnTo: props.returnTo, from: account } : { payTo: props.payTo, amount: effectiveAmount, memo, returnTo: props.returnTo, from: account }),
       }).then((r) => r.json());
       if (!prep.ok) throw new Error(prep.error || "Could not prepare the payment");
 
@@ -126,10 +129,15 @@ export default function Checkout(props: {
       const res = await fetch("/api/checkout/settle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ coffeeId: prep.coffeeId, signature }),
+        body: JSON.stringify(
+          props.handle
+            ? { coffeeId: prep.coffeeId, signature }
+            : { coffeeId: prep.coffeeId, signature, wallet: { payTo: props.payTo, from: account, amount: effectiveAmount, validBefore: prep.authorization.validBefore, memo, returnTo: props.returnTo } },
+        ),
       }).then((r) => r.json());
       if (!res.ok) throw new Error(res.error || "Settlement failed");
       setTx(res.transaction || null);
+      setBackTo(res.backTo || null);
       setStep("paid");
       if (res.redirect) {
         setTimeout(() => {
@@ -148,6 +156,11 @@ export default function Checkout(props: {
       const u = new URL(props.returnTo);
       u.searchParams.set("coffee", "cancelled");
       window.location.href = u.toString();
+    } else if (props.returnTo && safeHost(props.returnTo)) {
+      // Wallet mode: no origin list to check, so the user chooses to go back.
+      const u = new URL(props.returnTo);
+      u.searchParams.set("coffee", "cancelled");
+      window.location.href = u.toString();
     } else {
       window.history.length > 1 ? window.history.back() : (window.location.href = "/");
     }
@@ -159,10 +172,16 @@ export default function Checkout(props: {
         <div className="lbl">Thank you</div>
         <h2 style={{ marginTop: ".4rem" }}>Coffee delivered ☕</h2>
         <p className="dim">
-          {effectiveAmount} USDC sent to {props.handle}.{" "}
+          {effectiveAmount} USDC sent to {who}.{" "}
           {tx ? <a href={txLink(config.network, tx)} target="_blank" rel="noreferrer">View transaction</a> : null}
         </p>
-        {props.returnTo && props.returnAllowed ? <p className="note">Taking you back…</p> : props.returnTo ? <p className="note">You can close this tab and return to the original page.</p> : null}
+        {props.returnTo && props.returnAllowed ? (
+          <p className="note">Taking you back…</p>
+        ) : backTo ? (
+          <p><a className="btn" href={backTo}>Back to {safeHost(backTo)}</a></p>
+        ) : props.returnTo ? (
+          <p className="note">You can close this tab and return to the original page.</p>
+        ) : null}
       </section>
     );
   }
@@ -193,7 +212,7 @@ export default function Checkout(props: {
       <p className="note" style={{ marginTop: "1rem" }}>
         {amountOk ? (
           <>
-            {props.handle} receives {(effectiveAmount - fee).toFixed(2)} USDC · {fee.toFixed(2)} USDC covers the facilitator&apos;s gas (2%). One signature, no gas for you.
+            {who} receives {(effectiveAmount - fee).toFixed(2)} USDC · {fee.toFixed(2)} USDC covers the facilitator&apos;s gas (2%). One signature, no gas for you.
           </>
         ) : (
           <>Enter an amount between {config.minUsdc} and {config.maxUsdc} USDC.</>
@@ -231,6 +250,15 @@ export default function Checkout(props: {
       {error ? <p className="msg err">{error}</p> : null}
     </section>
   );
+}
+
+function safeHost(u: string): string | null {
+  try {
+    const x = new URL(u);
+    return x.protocol === "https:" || x.protocol === "http:" ? x.host : null;
+  } catch {
+    return null;
+  }
 }
 
 function txLink(network: string, tx: string) {

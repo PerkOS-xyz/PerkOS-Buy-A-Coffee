@@ -3,13 +3,16 @@
 The light side of [PerkOS Buy A Coffee](https://buyacoffee.perkos.xyz): a button that sends a donor to the hosted USDC checkout and brings them back with the result. No wallet code in your bundle.
 
 ```html
-<script src="https://buyacoffee.perkos.xyz/widget.js" data-handle="your-handle" data-amount="5" data-theme="auto"></script>
+<!-- wallet mode: no account, coffees go straight to this wallet -->
+<script src="https://buyacoffee.perkos.xyz/widget.js" data-wallet="0xYourWallet" data-name="Your Name" data-amount="5" data-theme="auto"></script>
+<!-- handle mode: registered creator -->
+<script src="https://buyacoffee.perkos.xyz/widget.js" data-handle="your-handle" data-amount="5"></script>
 ```
 
 ```tsx
 import { BuyACoffee } from "@perkos/buy-a-coffee/react";
 
-<BuyACoffee handle="your-handle" amount={5} label="Buy me an x402 coffee" onResult={(r) => r.status === "paid" && toast("Thanks!")} />
+<BuyACoffee wallet="0xYourWallet" name="Your Name" amount={5} label="Buy me an x402 coffee" onResult={(r) => r.status === "paid" && toast("Thanks!")} />
 ```
 
 ```ts
@@ -19,4 +22,4 @@ onCoffeeResult((r) => console.log(r)); // { status: "paid" | "cancelled" | "fail
 consumeResult(); // reads ?coffee=… from the current URL, cleans it, dispatches "perkos:coffee"
 ```
 
-Options: `handle` (required), `amount`, `memo`, `returnTo` (defaults to the current page), `label`, `theme` (`light` | `dark` | `auto`), `baseUrl`.
+Options: `wallet` + `name` (wallet mode) or `handle` (registered creator), `amount`, `memo`, `returnTo` (defaults to the current page), `label`, `theme` (`light` | `dark` | `auto`), `baseUrl`.

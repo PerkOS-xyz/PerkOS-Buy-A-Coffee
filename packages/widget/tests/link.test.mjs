@@ -25,3 +25,13 @@ test("parseResult reads and validates the result params", async () => {
   assert.equal(parseResult("https://s.ite/?coffee=nope"), null);
   assert.deepEqual(parseResult("https://s.ite/?coffee=paid&tx=javascript:1"), { status: "paid", tx: null, amount: null });
 });
+
+test("wallet mode links to /pay with the receiving wallet", async () => {
+  const { createCoffeeLink } = await import("../src/index.ts");
+  const url = new URL(createCoffeeLink({ wallet: "0xC2564e41B7F5Cb66d2d99466450CfebcE9e8228F", name: "Julio", amount: 5, returnTo: "https://juliomcruz.xyz/" }));
+  assert.equal(url.pathname, "/pay");
+  assert.equal(url.searchParams.get("to"), "0xc2564e41b7f5cb66d2d99466450cfebce9e8228f");
+  assert.equal(url.searchParams.get("name"), "Julio");
+  assert.equal(url.searchParams.get("amount"), "5");
+  assert.throws(() => createCoffeeLink({ wallet: "0x123", returnTo: "https://x.y" }));
+});
