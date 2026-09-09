@@ -1,0 +1,31 @@
+{
+  "name": "@perkos/buy-a-coffee",
+  "version": "0.1.0",
+  "description": "Buy A Coffee button for the x402 era: a light redirect widget for buyacoffee.perkos.xyz (script tag, React, or a plain link).",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/PerkOS-xyz/PerkOS-Buy-A-Coffee", "directory": "packages/widget" },
+  "homepage": "https://buyacoffee.perkos.xyz",
+  "keywords": ["x402", "usdc", "donations", "buy-me-a-coffee", "perkos", "base"],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./react": { "types": "./dist/react.d.ts", "import": "./dist/react.js" }
+  },
+  "files": ["dist", "README.md"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs"
+  },
+  "peerDependencies": { "react": ">=18" },
+  "peerDependenciesMeta": { "react": { "optional": true } },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "react": "^19.0.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}

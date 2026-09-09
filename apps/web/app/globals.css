@@ -1,0 +1,56 @@
+:root {
+  --ink: #0c0f13;
+  --ink-2: #12161c;
+  --rule: #232a33;
+  --paper: #e9e4d9;
+  --paper-dim: #9aa3ad;
+  --paper-faint: #6b7684;
+  --signal: #e0a145;
+  --signal-dim: #8a6428;
+  --base: #4d84ff;
+  --ok: #6ec66e;
+  --err: #e05454;
+  --serif: "Newsreader", Georgia, serif;
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ink); color: var(--paper); font-family: var(--sans); font-size: 16px; line-height: 1.5; }
+a { color: inherit; }
+button { font: inherit; cursor: pointer; }
+input, textarea { font: inherit; }
+.wrap { max-width: 42rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+.wrap.wide { max-width: 64rem; }
+.lbl { font-family: var(--mono); font-size: .7rem; letter-spacing: .18em; text-transform: uppercase; color: var(--paper-dim); font-weight: 500; }
+h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(1.9rem, 4vw, 2.6rem); line-height: 1.1; letter-spacing: -.02em; margin: .4rem 0 .6rem; }
+h2 { font-family: var(--serif); font-weight: 400; font-size: 1.5rem; margin: 2rem 0 .6rem; }
+p.dim { color: var(--paper-dim); }
+.card { background: var(--ink-2); border: 1px solid var(--rule); border-radius: 6px; padding: 1.25rem; }
+.row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+.amounts { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; margin: 1rem 0; }
+.amt { background: transparent; border: 1px solid var(--rule); color: var(--paper); border-radius: 4px; padding: .8rem .5rem; font-family: var(--mono); font-size: 1rem; }
+.amt.on { border-color: var(--signal); color: var(--signal); box-shadow: 0 0 0 1px var(--signal-dim); }
+.btn { font-family: var(--mono); font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; padding: .8rem 1.4rem; border-radius: 3px; border: 1px solid var(--signal); background: var(--signal); color: var(--ink); font-weight: 600; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.ghost { background: transparent; color: var(--paper-dim); border-color: var(--rule); }
+.btn.ghost:hover { color: var(--signal); border-color: var(--signal); }
+input[type=text], input[type=email], input[type=number], input[type=url], textarea {
+  width: 100%; background: var(--ink); border: 1px solid var(--rule); border-radius: 3px; color: var(--paper); padding: .7rem .9rem;
+}
+input:focus, textarea:focus { outline: none; border-color: var(--signal); }
+label.f { display: block; margin: 1rem 0 .3rem; font-family: var(--mono); font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--paper-dim); }
+.msg { font-family: var(--mono); font-size: .8rem; margin-top: .8rem; }
+.msg.ok { color: var(--ok); }
+.msg.err { color: var(--err); }
+.avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 2px solid var(--rule); }
+.tbl { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.tbl th, .tbl td { text-align: left; padding: .6rem .4rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.tbl th { font-family: var(--mono); font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--paper-faint); font-weight: 500; }
+pre.snip { background: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: .9rem; overflow-x: auto; font-family: var(--mono); font-size: .78rem; line-height: 1.5; }
+.top { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid var(--rule); font-family: var(--mono); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--paper-dim); }
+.top a { text-decoration: none; }
+.top .brand { color: var(--paper); }
+.stat { display: inline-block; margin-right: 1.6rem; }
+.stat b { display: block; font-family: var(--mono); font-size: 1.6rem; color: var(--signal); font-weight: 500; }
+.stat span { font-size: .8rem; color: var(--paper-faint); }
+.note { font-size: .85rem; color: var(--paper-faint); }
