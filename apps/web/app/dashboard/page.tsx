@@ -5,6 +5,7 @@ import { coffeesReceived, coffeesSent } from "@/lib/chain";
 import { getCreatorByWallet } from "@/lib/db";
 import { publicConfig } from "@/lib/config";
 import DashboardForm from "./DashboardForm";
+import WidgetBuilder from "./WidgetBuilder";
 
 export const dynamic = "force-dynamic";
 
@@ -44,13 +45,8 @@ export default async function Dashboard() {
       </div>
 
       <h2>Your button</h2>
-      <p className="note">Wallet mode needs no setup: coffees go straight to {short(wallet)}.</p>
-      <div className="lbl" style={{ marginTop: ".8rem" }}>Script tag (any site)</div>
-      <pre className="snip">{`<script src="${cfg.appUrl}/widget.js" data-wallet="${wallet}" data-name="${profile?.display_name || ""}" data-amount="5"></script>`}</pre>
-      <div className="lbl">GitHub README badge</div>
-      <pre className="snip">{`[![Buy me an x402 coffee](${cfg.appUrl}/badge/${wallet}.svg)](${cfg.appUrl}/pay?to=${wallet})`}</pre>
-      <div className="lbl">React</div>
-      <pre className="snip">{`import { BuyACoffee } from "@perkos/buy-a-coffee/react";\n<BuyACoffee wallet="${wallet}" amount={5} />`}</pre>
+      <p className="note">Wallet mode needs no setup: coffees go straight to {short(wallet)}. Tune the button, watch the preview, copy the snippet.</p>
+      <WidgetBuilder wallet={wallet} appUrl={cfg.appUrl} initialName={profile?.display_name || ""} />
 
       <h2>Coffees received</h2>
       {received.length === 0 ? <p className="note">None yet.</p> : (
