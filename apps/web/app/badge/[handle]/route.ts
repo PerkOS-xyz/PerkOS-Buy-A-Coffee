@@ -1,4 +1,5 @@
-import { isAddress } from "viem";
+import { isAddress, type Address } from "viem";
+import { coffeesCountFor } from "@/lib/chain";
 import { countSettled, countSettledByWallet, getCreatorByHandle } from "@/lib/db";
 
 /** GET /badge/{handle}.svg — a README badge that links to the checkout. */
@@ -10,7 +11,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ handle: string
   let count = 0;
   try {
     if (walletMode) {
-      count = (await countSettledByWallet(handle)).count;
+      // Wallet mode: the chain is the source of truth (CoffeeSplit `Coffee` events); the database is a fallback.
+      count = await coffeesCountFor(handle as Address).catch(async () => (await countSettledByWallet(handle)).count);
     } else {
       const c = await getCreatorByHandle(handle);
       known = !!c;
