@@ -38,6 +38,7 @@ export default async function CheckoutPage({
       <Checkout
         handle={creator.handle}
         payTo={creator.pay_to}
+        displayName={creator.display_name || creator.handle}
         amounts={creator.default_amounts}
         presetAmount={preset && Number.isFinite(preset) ? preset : null}
         presetMemo={typeof q.memo === "string" ? q.memo.slice(0, 140) : ""}

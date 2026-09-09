@@ -4,8 +4,9 @@ import { consumeResult, createButton, createCoffeeLink, injectStyle, onCoffeeRes
 
 function mount(script: HTMLScriptElement) {
   const handle = script.dataset.handle;
-  if (!handle) {
-    console.warn("[perkos-coffee] missing data-handle");
+  const wallet = script.dataset.wallet;
+  if (!handle && !wallet) {
+    console.warn("[perkos-coffee] missing data-handle or data-wallet");
     return;
   }
   injectStyle();
@@ -13,6 +14,8 @@ function mount(script: HTMLScriptElement) {
   const theme = (script.dataset.theme as "light" | "dark" | "auto" | undefined) || "auto";
   const a = createButton({
     handle,
+    wallet,
+    name: script.dataset.name,
     amount: amount && Number.isFinite(amount) ? amount : undefined,
     memo: script.dataset.memo,
     label: script.dataset.label,
@@ -26,7 +29,7 @@ function mount(script: HTMLScriptElement) {
 
 const current = document.currentScript as HTMLScriptElement | null;
 if (current) mount(current);
-else document.querySelectorAll<HTMLScriptElement>("script[data-handle][src*='widget.js']").forEach(mount);
+else document.querySelectorAll<HTMLScriptElement>("script[src*='widget.js'][data-handle], script[src*='widget.js'][data-wallet]").forEach(mount);
 
 // Returning donor: clean the URL and announce the result.
 const result = consumeResult();

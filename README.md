@@ -13,6 +13,14 @@ Design: `BUY-A-COFFEE-DESIGN.md` in the PerkOS workspace. Contract: [PerkOS-Cont
 
 ## Use it on a site
 
+Wallet mode, no account: the widget carries the receiving wallet and the service settles straight to it.
+
+```html
+<script src="https://buyacoffee.perkos.xyz/widget.js" data-wallet="0xYourWallet" data-name="Your Name" data-amount="5"></script>
+```
+
+Handle mode, with a registered creator (profile page, dashboard, automatic return to your site):
+
 ```html
 <script src="https://buyacoffee.perkos.xyz/widget.js" data-handle="your-handle" data-amount="5"></script>
 ```
@@ -21,22 +29,24 @@ React:
 
 ```tsx
 import { BuyACoffee } from "@perkos/buy-a-coffee/react";
-<BuyACoffee handle="your-handle" amount={5} onResult={(r) => console.log(r)} />
+<BuyACoffee wallet="0xYourWallet" name="Your Name" amount={5} onResult={(r) => console.log(r)} />
+// or <BuyACoffee handle="your-handle" amount={5} />
 ```
 
 GitHub README:
 
 ```md
-[![Buy me an x402 coffee](https://buyacoffee.perkos.xyz/badge/your-handle.svg)](https://buyacoffee.perkos.xyz/your-handle)
+[![Buy me an x402 coffee](https://buyacoffee.perkos.xyz/badge/0xYourWallet.svg)](https://buyacoffee.perkos.xyz/pay?to=0xYourWallet&name=Your%20Name)
+<!-- or, with a handle: /badge/your-handle.svg → /your-handle -->
 ```
 
-When the donor returns, the URL carries `?coffee=paid&tx=0x…&amount=5` (or `coffee=cancelled`). The widget cleans the URL and dispatches `perkos:coffee` on `window`. The checkout only redirects to origins the creator listed in the dashboard.
+When the donor returns, the URL carries `?coffee=paid&tx=0x…&amount=5` (or `coffee=cancelled`). The widget cleans the URL and dispatches `perkos:coffee` on `window`. In handle mode the checkout redirects automatically, but only to origins the creator listed in the dashboard; in wallet mode there is no origin list, so the donor gets a "Back to your-site" button instead (no open redirect).
 
 ## Flow
 
-1. `POST /api/checkout/prepare` records a `pending` coffee and returns the EIP-3009 `ReceiveWithAuthorization` typed data (`to = CoffeeSplit`, `nonce = coffeeNonce(payTo, coffeeId)`, 10-minute window).
+1. `POST /api/checkout/prepare` (with `handle` or `payTo`) returns the EIP-3009 `ReceiveWithAuthorization` typed data (`to = CoffeeSplit`, `nonce = coffeeNonce(payTo, coffeeId)`, 10-minute window).
 2. The donor signs in the browser (EIP-6963 injected wallets; chain switch to Base if needed).
-3. `POST /api/checkout/settle` calls Stack `verify` then `settle` with `paymentRequirements.extra.split`; the sponsor wallet executes `CoffeeSplit.settle(...)`. The coffee becomes `settled` with the tx hash, or `failed` with the reason.
+3. `POST /api/checkout/settle` re-derives the authorization server-side (the nonce binds `payTo` + `coffeeId`, so the recipient cannot be swapped), calls Stack `verify` then `settle` with `paymentRequirements.extra.split`; the sponsor wallet executes `CoffeeSplit.settle(...)`. The coffee is recorded as `settled`/`failed`; in wallet mode the database is optional (best-effort record).
 4. Redirect to `return_to` with the result.
 
 ## Run locally

@@ -17,13 +17,13 @@ export default function Landing() {
 
       <h2>How it works</h2>
       <ol className="dim" style={{ paddingLeft: "1.2rem" }}>
-        <li>Sign in with your email, pick a handle, paste the wallet that should receive coffees.</li>
+        <li>Drop the script with your wallet on your site (no account), or sign in with your email for a handle, a profile page and automatic returns.</li>
         <li>Put the button on your site, or the badge in your README. Both link to <code>buyacoffee.perkos.xyz/your-handle</code>.</li>
         <li>A donor picks 5, 10, 50 or a custom amount, signs once, and is sent back to your site with the result.</li>
       </ol>
 
       <h2>Add it to a site</h2>
-      <pre className="snip">{`<script src="${cfg.appUrl}/widget.js" data-handle="your-handle" data-amount="5"></script>`}</pre>
+      <pre className="snip">{`<!-- wallet mode, no account -->\n<script src="${cfg.appUrl}/widget.js" data-wallet="0xYourWallet" data-name="Your Name" data-amount="5"></script>\n<!-- or a registered handle -->\n<script src="${cfg.appUrl}/widget.js" data-handle="your-handle" data-amount="5"></script>`}</pre>
       <h2>Add it to a README</h2>
       <pre className="snip">{`[![Buy me an x402 coffee](${cfg.appUrl}/badge/your-handle.svg)](${cfg.appUrl}/your-handle)`}</pre>
       <h2>React</h2>

@@ -10,8 +10,12 @@
 export const DEFAULT_BASE_URL = "https://buyacoffee.perkos.xyz";
 
 export interface CoffeeLinkOptions {
-  /** Creator handle on buyacoffee.perkos.xyz. */
-  handle: string;
+  /** Creator handle on buyacoffee.perkos.xyz (registered creator). */
+  handle?: string;
+  /** Wallet mode: the receiving wallet, no account needed. Takes precedence over `handle`. */
+  wallet?: string;
+  /** Display name for wallet mode. */
+  name?: string;
   /** Preselected amount in USDC (the donor can change it). */
   amount?: number;
   /** Optional message, up to 140 characters. */
@@ -38,8 +42,16 @@ function baseUrl(opt?: { baseUrl?: string }): string {
 
 /** Builds the checkout URL. Safe to call on the server (no `window` needed when `returnTo` is given). */
 export function createCoffeeLink(opt: CoffeeLinkOptions): string {
-  if (!opt.handle || !/^[a-z0-9-]{1,32}$/i.test(opt.handle)) throw new Error("createCoffeeLink: invalid handle");
-  const u = new URL(`${baseUrl(opt)}/${opt.handle.toLowerCase()}`);
+  let u: URL;
+  if (opt.wallet) {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(opt.wallet)) throw new Error("createCoffeeLink: invalid wallet");
+    u = new URL(`${baseUrl(opt)}/pay`);
+    u.searchParams.set("to", opt.wallet.toLowerCase());
+    if (opt.name) u.searchParams.set("name", opt.name.slice(0, 80));
+  } else {
+    if (!opt.handle || !/^[a-z0-9-]{1,32}$/i.test(opt.handle)) throw new Error("createCoffeeLink: a handle or a wallet is required");
+    u = new URL(`${baseUrl(opt)}/${opt.handle.toLowerCase()}`);
+  }
   const returnTo = opt.returnTo ?? (typeof window !== "undefined" ? window.location.href : undefined);
   if (returnTo) u.searchParams.set("return_to", stripResult(returnTo));
   if (opt.amount && Number.isFinite(opt.amount) && opt.amount > 0) u.searchParams.set("amount", String(opt.amount));
