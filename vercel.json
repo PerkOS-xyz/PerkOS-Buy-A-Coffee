@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/health?alert=1", "schedule": "0 12 * * *" }
+  ]
+}
