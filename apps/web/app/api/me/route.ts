@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { isAddress } from "viem";
 import { z } from "zod";
-import { currentCreator } from "@/lib/auth";
-import { getCreatorByHandle, HANDLE_RE, RESERVED_HANDLES, updateCreator } from "@/lib/db";
+import { currentWallet } from "@/lib/auth";
+import { getCreatorByHandle, getCreatorByWallet, HANDLE_RE, RESERVED_HANDLES, updateCreator, upsertCreatorByWallet } from "@/lib/db";
 import { normalizeOrigin } from "@/lib/returnTo";
 
 export async function GET() {
-  const me = await currentCreator();
-  if (!me) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  return NextResponse.json({ creator: me });
+  const wallet = await currentWallet();
+  if (!wallet) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const creator = await getCreatorByWallet(wallet).catch(() => null);
+  return NextResponse.json({ wallet, creator });
 }
 
 const Body = z.object({
@@ -22,11 +23,18 @@ const Body = z.object({
 });
 
 export async function PUT(req: Request) {
-  const me = await currentCreator();
-  if (!me) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const wallet = await currentWallet();
+  if (!wallet) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid input" }, { status: 400 });
   const b = parsed.data;
+
+  let me;
+  try {
+    me = await upsertCreatorByWallet(wallet);
+  } catch {
+    return NextResponse.json({ error: "Profiles need the database, which is not configured yet. Wallet mode keeps working without it." }, { status: 503 });
+  }
 
   let handle: string | undefined;
   if (b.handle !== undefined) {
@@ -41,7 +49,7 @@ export async function PUT(req: Request) {
 
   const updated = await updateCreator(me.id, {
     handle,
-    pay_to: b.payTo?.toLowerCase(),
+    pay_to: (b.payTo ?? me.pay_to ?? wallet).toLowerCase(),
     display_name: b.displayName,
     avatar_url: b.avatarUrl === "" ? null : b.avatarUrl,
     message: b.message,

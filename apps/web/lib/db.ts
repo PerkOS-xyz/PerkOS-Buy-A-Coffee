@@ -4,7 +4,8 @@ import { neon } from "@neondatabase/serverless";
 
 export interface Creator {
   id: string;
-  email: string;
+  email: string | null;
+  wallet: string | null;
   handle: string | null;
   pay_to: string | null;
   display_name: string | null;
@@ -66,10 +67,17 @@ export async function getCreatorById(id: string): Promise<Creator | null> {
   return rows[0] ?? null;
 }
 
-export async function upsertCreatorByEmail(email: string): Promise<Creator> {
+export async function getCreatorByWallet(wallet: string): Promise<Creator | null> {
+  const rows = (await sql()`SELECT * FROM creators WHERE wallet = ${wallet.toLowerCase()} LIMIT 1`) as Creator[];
+  return rows[0] ?? null;
+}
+
+/** Creates the profile row for a wallet on first sign-in; pay_to defaults to the wallet itself. */
+export async function upsertCreatorByWallet(wallet: string): Promise<Creator> {
+  const w = wallet.toLowerCase();
   const rows = (await sql()`
-    INSERT INTO creators (email) VALUES (${email.toLowerCase()})
-    ON CONFLICT (email) DO UPDATE SET updated_at = now()
+    INSERT INTO creators (wallet, pay_to) VALUES (${w}, ${w})
+    ON CONFLICT (wallet) DO UPDATE SET updated_at = now()
     RETURNING *`) as Creator[];
   return rows[0];
 }
@@ -151,16 +159,4 @@ export async function countSettledByWallet(payTo: string): Promise<{ count: numb
     SELECT count(*)::int AS count, COALESCE(sum(amount), 0)::text AS total
     FROM coffees WHERE pay_to = ${payTo.toLowerCase()} AND status = 'settled'`) as { count: number; total: string }[];
   return rows[0] ?? { count: 0, total: "0" };
-}
-
-export async function createLoginToken(email: string, tokenHash: string, expiresAt: Date): Promise<void> {
-  await sql()`INSERT INTO login_tokens (email, token_hash, expires_at) VALUES (${email.toLowerCase()}, ${tokenHash}, ${expiresAt.toISOString()})`;
-}
-
-export async function consumeLoginToken(tokenHash: string): Promise<string | null> {
-  const rows = (await sql()`
-    UPDATE login_tokens SET used_at = now()
-    WHERE token_hash = ${tokenHash} AND used_at IS NULL AND expires_at > now()
-    RETURNING email`) as { email: string }[];
-  return rows[0]?.email ?? null;
 }
