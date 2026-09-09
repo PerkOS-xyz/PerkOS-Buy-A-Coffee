@@ -8,7 +8,7 @@ Design: `BUY-A-COFFEE-DESIGN.md` in the PerkOS workspace. Contract: [PerkOS-Cont
 
 | Path | What |
 |---|---|
-| `apps/web` | Next.js 15 service: checkout `/{handle}`, badge `/badge/{handle}.svg`, creator dashboard, API. Neon Postgres, Resend magic links, viem. |
+| `apps/web` | Next.js 15 service: checkout `/pay?to=…` and `/{handle}`, badge `/badge/{wallet-or-handle}.svg`, wallet dashboard, API. Privy wallet sign-in, viem, Neon Postgres (optional). |
 | `packages/widget` | `@perkos/buy-a-coffee`: script tag, React component, `createCoffeeLink()`. No web3 dependencies. |
 
 ## Use it on a site
@@ -42,6 +42,10 @@ GitHub README:
 
 When the donor returns, the URL carries `?coffee=paid&tx=0x…&amount=5` (or `coffee=cancelled`). The widget cleans the URL and dispatches `perkos:coffee` on `window`. In handle mode the checkout redirects automatically, but only to origins the creator listed in the dashboard; in wallet mode there is no origin list, so the donor gets a "Back to your-site" button instead (no open redirect).
 
+## Dashboard
+
+Sign in with a wallet (Privy) and the dashboard lists coffees **received** (`Coffee` events where `creator` = wallet) and **sent** (`from` = wallet) directly from the CoffeeSplit contract, plus ready-to-copy snippets for that wallet. With a database, a handle/profile page can be claimed too.
+
 ## Flow
 
 1. `POST /api/checkout/prepare` (with `handle` or `payTo`) returns the EIP-3009 `ReceiveWithAuthorization` typed data (`to = CoffeeSplit`, `nonce = coffeeNonce(payTo, coffeeId)`, 10-minute window).
@@ -53,7 +57,7 @@ When the donor returns, the URL carries `?coffee=paid&tx=0x…&amount=5` (or `co
 
 ```bash
 npm install
-cp apps/web/.env.example apps/web/.env   # fill DATABASE_URL, SESSION_SECRET, RESEND_API_KEY (optional locally: links print to the console)
+cp apps/web/.env.example apps/web/.env   # SESSION_SECRET required; DATABASE_URL and NEXT_PUBLIC_PRIVY_APP_ID optional locally
 npm run db:migrate -w apps/web
 npm run build -w packages/widget
 npm run dev
@@ -74,7 +78,7 @@ Env already set (production, preview, development): `APP_URL`, `NETWORK=base-sep
 Still needed before the first coffee:
 
 1. **Database**: create a Neon Postgres (Vercel Marketplace → Neon, or neon.tech), set `DATABASE_URL` on the project, then run `DATABASE_URL=… npm run db:migrate -w apps/web` once. The migrations also seed the first creator, `juliomcruz` (pay-to `0xc2564e41B7F5Cb66d2d99466450CfebcE9e8228f`, allowed origins juliomcruz.xyz and github.com).
-2. **Email**: set `RESEND_API_KEY` (the key on juliomcruz-xyz is a sensitive var and cannot be copied) and a `FROM_EMAIL` on a domain verified in Resend (e.g. `Buy A Coffee <coffee@perkos.xyz>` once `perkos.xyz` is verified there).
+2. **Sign-in**: `NEXT_PUBLIC_PRIVY_APP_ID` (the PerkOS Privy app is reused) and `https://buyacoffee.perkos.xyz` added to that app's allowed origins in the Privy dashboard. Sessions are proven by a signed challenge (`/api/auth/challenge` → `/api/auth/wallet`); no Privy server secret.
 3. **Stack** (facilitator): merge PerkOS-xyz/Stack PR #147; `COFFEE_SPLIT_ADDRESS_BASE_SEPOLIA` is already set on the `stack` project. In the Stack dashboard create an API key, claim and verify the vendor domain `buyacoffee.perkos.xyz`, and add a `domain_whitelist` sponsor rule for it pointing at a funded sponsor wallet on Base Sepolia. Set that key here as `PERKOS_STACK_API_KEY`.
 4. **DNS**: the CNAME above.
 

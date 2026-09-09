@@ -11,13 +11,13 @@ export default function Landing() {
         The PerkOS facilitator settles on {cfg.networkName}; the creator receives 98% instantly and 2% covers the gas.
       </p>
       <div className="row" style={{ marginTop: "1.5rem" }}>
-        <a className="btn" href="/dashboard">Create your page</a>
+        <a className="btn" href="/login">Sign in with wallet</a>
         <a className="btn ghost" href="https://github.com/PerkOS-xyz/PerkOS-Buy-A-Coffee">Source on GitHub</a>
       </div>
 
       <h2>How it works</h2>
       <ol className="dim" style={{ paddingLeft: "1.2rem" }}>
-        <li>Drop the script with your wallet on your site (no account), or sign in with your email for a handle, a profile page and automatic returns.</li>
+        <li>Drop the script with your wallet on your site (no account), or sign in with your wallet to see received and sent coffees and, optionally, claim a handle.</li>
         <li>Put the button on your site, or the badge in your README. Both link to <code>buyacoffee.perkos.xyz/your-handle</code>.</li>
         <li>A donor picks 5, 10, 50 or a custom amount, signs once, and is sent back to your site with the result.</li>
       </ol>

@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Providers } from "./providers";
+import { NavAuth } from "./NavAuth";
+import { currentWallet } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "Buy A Coffee · PerkOS",
@@ -7,7 +10,8 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_URL || "https://buyacoffee.perkos.xyz"),
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const wallet = await currentWallet().catch(() => null);
   return (
     <html lang="en">
       <head>
@@ -19,13 +23,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        <div className="top">
-          <a className="brand" href="/">☕ Buy A Coffee <span style={{ color: "var(--paper-faint)" }}>· PerkOS</span></a>
-          <nav className="row">
-            <a href="/dashboard">Dashboard</a>
-          </nav>
-        </div>
-        {children}
+        <Providers>
+          <div className="top">
+            <a className="brand" href="/">☕ Buy A Coffee <span style={{ color: "var(--paper-faint)" }}>· PerkOS</span></a>
+            <nav className="row">
+              <NavAuth wallet={wallet} />
+            </nav>
+          </div>
+          {children}
+        </Providers>
       </body>
     </html>
   );
