@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { isAddress, type Address, type Hex } from "viem";
 import { z } from "zod";
 import { getCreatorByHandle, insertCoffee } from "@/lib/db";
-import { getNetwork, MAX_USDC, MIN_USDC } from "@/lib/config";
+import { tryNetwork, MAX_USDC, MIN_USDC } from "@/lib/config";
 import { buildTypedData, coffeeNonce, usdcUnits } from "@/lib/x402";
 import { clientIp, LIMITS, rateLimit } from "@/lib/rateLimit";
 
@@ -17,6 +17,7 @@ const Body = z
     memo: z.string().max(140).optional().nullable(),
     returnTo: z.string().url().optional().nullable(),
     from: addr,
+    network: z.string().max(20).optional().nullable(),
   })
   .refine((b) => b.handle || b.payTo, "handle or payTo is required");
 
@@ -32,6 +33,8 @@ export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false, error: "Invalid input" }, { status: 400 });
   const { handle, amount, memo, returnTo, from } = parsed.data;
+  const n = tryNetwork(parsed.data.network);
+  if (!n) return NextResponse.json({ ok: false, error: "Network not enabled" }, { status: 400 });
   const fromLimit = rateLimit(`prepare:from:${from.toLowerCase()}`, LIMITS.prepareFrom.limit, LIMITS.prepareFrom.windowMs);
   if (!fromLimit.allowed) return NextResponse.json({ ok: false, error: "Too many coffees from this wallet. Try again in a minute." }, { status: 429, headers: { "Retry-After": String(fromLimit.retryAfter) } });
 
@@ -50,7 +53,6 @@ export async function POST(req: Request) {
   }
   if (payTo.toLowerCase() === from.toLowerCase()) return NextResponse.json({ ok: false, error: "You cannot buy yourself a coffee" }, { status: 400 });
 
-  const n = getNetwork();
   const coffeeId = `0x${randomBytes(32).toString("hex")}` as Hex;
   const now = Math.floor(Date.now() / 1000);
   const authorization = {
@@ -78,6 +80,6 @@ export async function POST(req: Request) {
     console.warn("prepare: db unavailable, continuing in wallet mode", (e as Error).message);
   }
 
-  const typedData = await buildTypedData(authorization);
-  return NextResponse.json({ ok: true, coffeeId, payTo, label, authorization, typedData });
+  const typedData = await buildTypedData(authorization, n);
+  return NextResponse.json({ ok: true, coffeeId, payTo, label, network: n.key, symbol: n.symbol, authorization, typedData });
 }

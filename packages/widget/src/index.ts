@@ -18,6 +18,8 @@ export interface CoffeeLinkOptions {
   name?: string;
   /** Preselected amount in USDC (the donor can change it). */
   amount?: number;
+  /** Network to pay on: base (default), celo, robinhood. The donor can switch on the checkout. */
+  network?: string;
   /** Optional message, up to 140 characters. */
   memo?: string;
   /** Where to send the donor back. Defaults to the current page URL in the browser. */
@@ -56,6 +58,7 @@ export function createCoffeeLink(opt: CoffeeLinkOptions): string {
   if (returnTo) u.searchParams.set("return_to", stripResult(returnTo));
   if (opt.amount && Number.isFinite(opt.amount) && opt.amount > 0) u.searchParams.set("amount", String(opt.amount));
   if (opt.memo) u.searchParams.set("memo", opt.memo.slice(0, 140));
+  if (opt.network && /^[a-z0-9-]{1,20}$/.test(opt.network)) u.searchParams.set("network", opt.network);
   return u.toString();
 }
 

@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
 import { isAddress } from "viem";
-import { publicConfig } from "@/lib/config";
+import { publicConfig, tryNetwork } from "@/lib/config";
 import Checkout from "../[handle]/Checkout";
 
 export const dynamic = "force-dynamic";
 
-type Search = { to?: string; name?: string; amount?: string; memo?: string; return_to?: string };
+type Search = { to?: string; name?: string; amount?: string; memo?: string; return_to?: string; network?: string };
 
 /** Wallet mode: /pay?to=0x…&name=…  No account, no database needed. */
 export default async function PayPage({ searchParams }: { searchParams: Promise<Search> }) {
@@ -22,13 +22,15 @@ export default async function PayPage({ searchParams }: { searchParams: Promise<
     host = null;
   }
   const short = `${to.slice(0, 6)}…${to.slice(-4)}`;
+  const network = tryNetwork(typeof q.network === "string" ? q.network : null);
+  const config = publicConfig(network?.key);
 
   return (
     <main className="wrap">
       <div className="lbl">Buy a coffee for</div>
       <h1>{name || short}</h1>
       <p className="dim">
-        USDC goes straight to <code>{short}</code>{host ? <> · from <strong>{host}</strong></> : null}.
+        {config.symbol} on {config.networkName} goes straight to <code>{short}</code>{host ? <> · from <strong>{host}</strong></> : null}.
       </p>
       <Checkout
         handle={null}
@@ -39,7 +41,7 @@ export default async function PayPage({ searchParams }: { searchParams: Promise<
         presetMemo={typeof q.memo === "string" ? q.memo.slice(0, 140) : ""}
         returnTo={returnTo}
         returnAllowed={false}
-        config={publicConfig()}
+        config={config}
       />
     </main>
   );

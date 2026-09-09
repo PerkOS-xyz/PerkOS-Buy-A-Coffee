@@ -6,8 +6,9 @@ import { BUTTON_STYLE, createCoffeeLink } from "@perkos/buy-a-coffee";
 type Theme = "auto" | "light" | "dark";
 type Tab = "script" | "react" | "link" | "badge";
 
-export default function WidgetBuilder({ wallet, appUrl, initialName }: { wallet: string; appUrl: string; initialName: string }) {
+export default function WidgetBuilder({ wallet, appUrl, initialName, networks }: { wallet: string; appUrl: string; initialName: string; networks: { key: string; name: string; symbol: string }[] }) {
   const [name, setName] = useState(initialName);
+  const [network, setNetwork] = useState<string>(networks[0]?.key || "base");
   const [label, setLabel] = useState("Buy me an x402 coffee");
   const [theme, setTheme] = useState<Theme>("auto");
   const [amount, setAmount] = useState<string>("5");
@@ -27,8 +28,8 @@ export default function WidgetBuilder({ wallet, appUrl, initialName }: { wallet:
 
   const amt = amount && Number.isFinite(Number(amount)) && Number(amount) > 0 ? Number(amount) : undefined;
   const link = useMemo(
-    () => createCoffeeLink({ wallet, name: name || undefined, amount: amt, memo: memo || undefined, returnTo: "https://your-site.example/page", baseUrl: appUrl }),
-    [wallet, name, amt, memo, appUrl],
+    () => createCoffeeLink({ wallet, name: name || undefined, amount: amt, memo: memo || undefined, network: network !== networks[0]?.key ? network : undefined, returnTo: "https://your-site.example/page", baseUrl: appUrl }),
+    [wallet, name, amt, memo, network, networks, appUrl],
   );
   const effectiveTheme = theme === "auto" ? (pageBg === "light" ? "light" : "dark") : theme;
 
@@ -37,14 +38,15 @@ export default function WidgetBuilder({ wallet, appUrl, initialName }: { wallet:
     name ? `data-name="${escapeAttr(name)}"` : "",
     amt ? `data-amount="${amt}"` : "",
     memo ? `data-memo="${escapeAttr(memo)}"` : "",
+    network !== networks[0]?.key ? `data-network="${network}"` : "",
     label !== "Buy me an x402 coffee" ? `data-label="${escapeAttr(label)}"` : "",
     theme !== "auto" ? `data-theme="${theme}"` : "",
   ].filter(Boolean);
 
   const snippets: Record<Tab, string> = {
     script: `<script src="${appUrl}/widget.js"\n  ${attrs.join("\n  ")}></script>`,
-    react: `import { BuyACoffee } from "@perkos/buy-a-coffee/react";\n\n<BuyACoffee\n  wallet="${wallet}"${name ? `\n  name="${escapeAttr(name)}"` : ""}${amt ? `\n  amount={${amt}}` : ""}${memo ? `\n  memo="${escapeAttr(memo)}"` : ""}${label !== "Buy me an x402 coffee" ? `\n  label="${escapeAttr(label)}"` : ""}${theme !== "auto" ? `\n  theme="${theme}"` : ""}\n  onResult={(r) => console.log(r)}\n/>`,
-    link: `${appUrl}/pay?to=${wallet}${name ? `&name=${encodeURIComponent(name)}` : ""}${amt ? `&amount=${amt}` : ""}${memo ? `&memo=${encodeURIComponent(memo)}` : ""}`,
+    react: `import { BuyACoffee } from "@perkos/buy-a-coffee/react";\n\n<BuyACoffee\n  wallet="${wallet}"${name ? `\n  name="${escapeAttr(name)}"` : ""}${amt ? `\n  amount={${amt}}` : ""}${memo ? `\n  memo="${escapeAttr(memo)}"` : ""}${network !== networks[0]?.key ? `\n  network="${network}"` : ""}${label !== "Buy me an x402 coffee" ? `\n  label="${escapeAttr(label)}"` : ""}${theme !== "auto" ? `\n  theme="${theme}"` : ""}\n  onResult={(r) => console.log(r)}\n/>`,
+    link: `${appUrl}/pay?to=${wallet}${name ? `&name=${encodeURIComponent(name)}` : ""}${amt ? `&amount=${amt}` : ""}${memo ? `&memo=${encodeURIComponent(memo)}` : ""}${network !== networks[0]?.key ? `&network=${network}` : ""}`,
     badge: `[![${escapeAttr(label)}](${appUrl}/badge/${wallet}.svg)](${appUrl}/pay?to=${wallet}${name ? `&name=${encodeURIComponent(name)}` : ""})`,
   };
 
@@ -78,6 +80,16 @@ export default function WidgetBuilder({ wallet, appUrl, initialName }: { wallet:
           </div>
           <label className="f" htmlFor="wb-memo">Prefilled message (optional)</label>
           <input id="wb-memo" type="text" maxLength={140} value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="" />
+          {networks.length > 1 ? (
+            <>
+              <label className="f">Network the donor lands on (they can switch)</label>
+              <div className="row">
+                {networks.map((n) => (
+                  <button key={n.key} type="button" className={`amt ${network === n.key ? "on" : ""}`} style={{ padding: ".45rem .8rem" }} onClick={() => setNetwork(n.key)}>{n.name} · {n.symbol}</button>
+                ))}
+              </div>
+            </>
+          ) : null}
           <label className="f">Theme</label>
           <div className="row">
             {(["auto", "light", "dark"] as Theme[]).map((t) => (

@@ -1,4 +1,4 @@
-// <script src="https://buyacoffee.perkos.xyz/widget.js" data-handle="…" data-amount="5" data-label="…" data-theme="auto">
+// <script src="https://buyacoffee.perkos.xyz/widget.js" data-handle="…" data-amount="5" data-network="base" data-label="…" data-theme="auto">
 // Renders the button in place of the script tag and reports a returning donor's result.
 import { consumeResult, createButton, createCoffeeLink, injectStyle, onCoffeeResult, parseResult } from "./index";
 
@@ -18,6 +18,7 @@ function mount(script: HTMLScriptElement) {
     name: script.dataset.name,
     amount: amount && Number.isFinite(amount) ? amount : undefined,
     memo: script.dataset.memo,
+    network: script.dataset.network,
     label: script.dataset.label,
     theme,
     baseUrl: script.dataset.baseUrl || new URL(script.src).origin,

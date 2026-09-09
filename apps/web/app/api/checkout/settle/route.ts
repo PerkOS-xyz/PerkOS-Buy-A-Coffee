@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { isAddress, isHex, type Address, type Hex } from "viem";
 import { z } from "zod";
 import { getCoffee, getCreatorById, insertCoffee, markCoffee } from "@/lib/db";
-import { APP_URL, getNetwork, FEE_BPS, MAX_USDC, MIN_USDC } from "@/lib/config";
+import { APP_URL, networkByCaip2, tryNetwork, FEE_BPS, MAX_USDC, MIN_USDC, type NetworkConfig } from "@/lib/config";
 import { coffeeNonce, settleCoffee, usdcUnits } from "@/lib/x402";
 import { isAllowedReturnTo, withResult } from "@/lib/returnTo";
 import { clientIp, LIMITS, rateLimit } from "@/lib/rateLimit";
@@ -24,6 +24,7 @@ const Body = z.object({
       validBefore: z.string().regex(/^\d+$/),
       memo: z.string().max(140).optional().nullable(),
       returnTo: z.string().url().optional().nullable(),
+      network: z.string().max(20).optional().nullable(),
     })
     .optional(),
 });
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false, error: "Invalid input" }, { status: 400 });
   const { coffeeId, signature, wallet } = parsed.data;
-  const n = getNetwork();
+  let n: NetworkConfig | null = null;
   const nowSec = Math.floor(Date.now() / 1000);
 
   // Resolve the coffee: from the database (handle mode) or from the wallet-mode payload.
@@ -63,6 +64,7 @@ export async function POST(req: Request) {
     returnTo = row.return_to;
     label = creator?.handle || payTo;
     allowedOrigins = creator?.allowed_origins ?? [];
+    n = networkByCaip2(row.network);
   } else if (wallet) {
     payTo = wallet.payTo.toLowerCase() as Address;
     from = wallet.from.toLowerCase() as Address;
@@ -71,10 +73,13 @@ export async function POST(req: Request) {
     memo = wallet.memo || null;
     returnTo = wallet.returnTo || null;
     label = payTo;
+    n = tryNetwork(wallet.network);
     if (validBefore > nowSec + 10 * 60 + 60) return NextResponse.json({ ok: false, error: "Invalid window" }, { status: 400 });
   } else {
     return NextResponse.json({ ok: false, error: "Unknown coffee" }, { status: 404 });
   }
+
+  if (!n) return NextResponse.json({ ok: false, error: "Network not enabled" }, { status: 400 });
 
   if (nowSec > validBefore) {
     if (hasRow) await markCoffee(coffeeId, { status: "failed", error: "expired" }).catch(() => {});
@@ -94,6 +99,7 @@ export async function POST(req: Request) {
   };
 
   const result = await settleCoffee({
+    network: n.key,
     handle: label,
     amountUnits: authorization.value,
     creator: payTo,
@@ -122,7 +128,7 @@ export async function POST(req: Request) {
     redirect = withResult(returnTo, { status: "paid", tx: result.transaction, amount: String(amount) });
   }
   const backTo = returnTo && !redirect ? safeBack(returnTo, result.transaction, amount) : null;
-  return NextResponse.json({ ok: true, transaction: result.transaction ?? null, redirect, backTo });
+  return NextResponse.json({ ok: true, transaction: result.transaction ?? null, network: n.key, redirect, backTo });
 }
 
 function safeBack(returnTo: string, tx: string | null | undefined, amount: number): string | null {

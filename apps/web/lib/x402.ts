@@ -1,7 +1,8 @@
 // x402 plumbing: EIP-3009 typed data for the donor, and verify/settle calls
 // to the PerkOS facilitator (Stack) with the CoffeeSplit `extra.split`.
+// Everything is per network: the request says which one.
 import { createPublicClient, http, type Address, type Hex } from "viem";
-import { APP_URL, STACK_API_KEY, STACK_URL, getNetwork } from "./config";
+import { APP_URL, STACK_API_KEY, STACK_URL, getNetwork, type NetworkConfig, type NetworkKey } from "./config";
 import { memoHash } from "./pure";
 
 export { coffeeNonce, memoHash, usdcUnits } from "./pure";
@@ -35,28 +36,37 @@ const EIP712_ABI = [
   { name: "version", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
 ] as const;
 
-let domainCache: { name: string; version: string } | null = null;
+const domainCache = new Map<NetworkKey, { name: string; version: string }>();
 
-/** USDC's EIP-712 domain (name differs between Base "USD Coin" and Base Sepolia "USDC"). */
-export async function usdcDomain(): Promise<{ name: string; version: string; chainId: number; verifyingContract: Address }> {
-  const n = getNetwork();
-  if (!domainCache) {
-    const client = createPublicClient({ transport: http(n.rpcUrl) });
-    try {
-      const d = await client.readContract({ address: n.usdc, abi: EIP712_ABI, functionName: "eip712Domain" });
-      domainCache = { name: d[1], version: d[2] };
-    } catch {
-      const name = await client.readContract({ address: n.usdc, abi: EIP712_ABI, functionName: "name" });
-      let version = "2";
+/**
+ * The token's EIP-712 domain. Configured per network when the token cannot
+ * tell us (USDG has neither version() nor eip712Domain()); read on-chain
+ * otherwise (USDC is "USD Coin" on Base, "USDC" on Base Sepolia and Celo).
+ */
+export async function usdcDomain(n: NetworkConfig): Promise<{ name: string; version: string; chainId: number; verifyingContract: Address }> {
+  let cached = domainCache.get(n.key);
+  if (!cached) {
+    if (n.domain) {
+      cached = n.domain;
+    } else {
+      const client = createPublicClient({ transport: http(n.rpcUrl) });
       try {
-        version = await client.readContract({ address: n.usdc, abi: EIP712_ABI, functionName: "version" });
+        const d = await client.readContract({ address: n.asset, abi: EIP712_ABI, functionName: "eip712Domain" });
+        cached = { name: d[1], version: d[2] };
       } catch {
-        // FiatTokenV2 without version(): "2"
+        const name = await client.readContract({ address: n.asset, abi: EIP712_ABI, functionName: "name" });
+        let version = "2";
+        try {
+          version = await client.readContract({ address: n.asset, abi: EIP712_ABI, functionName: "version" });
+        } catch {
+          // FiatTokenV2 without version(): "2"
+        }
+        cached = { name, version };
       }
-      domainCache = { name, version };
     }
+    domainCache.set(n.key, cached);
   }
-  return { ...domainCache, chainId: n.chainId, verifyingContract: n.usdc };
+  return { ...cached, chainId: n.chainId, verifyingContract: n.asset };
 }
 
 export const RECEIVE_TYPES = {
@@ -70,8 +80,8 @@ export const RECEIVE_TYPES = {
   ],
 } as const;
 
-export async function buildTypedData(auth: Authorization) {
-  const domain = await usdcDomain();
+export async function buildTypedData(auth: Authorization, n: NetworkConfig) {
+  const domain = await usdcDomain(n);
   return {
     domain,
     types: RECEIVE_TYPES,
@@ -94,13 +104,12 @@ export interface StackResult {
   payer?: string | null;
 }
 
-function requirements(params: { handle: string; amountUnits: string; creator: Address; coffeeId: Hex; memo: string | null }) {
-  const n = getNetwork();
+function requirements(params: { handle: string; amountUnits: string; creator: Address; coffeeId: Hex; memo: string | null }, n: NetworkConfig) {
   return {
     scheme: "exact",
     network: n.caip2,
     amount: params.amountUnits,
-    asset: n.usdc,
+    asset: n.asset,
     payTo: n.coffeeSplit,
     maxTimeoutSeconds: 600,
     resource: {
@@ -135,8 +144,9 @@ async function callStack(path: "verify" | "settle", body: unknown): Promise<Reco
   return json;
 }
 
-/** verify then settle a coffee through Stack. */
+/** verify then settle a coffee through Stack, on the coffee's network. */
 export async function settleCoffee(params: {
+  network: NetworkKey;
   handle: string;
   amountUnits: string;
   creator: Address;
@@ -145,7 +155,7 @@ export async function settleCoffee(params: {
   authorization: Authorization;
   signature: Hex;
 }): Promise<StackResult> {
-  const n = getNetwork();
+  const n = getNetwork(params.network);
   const body = {
     x402Version: 2,
     paymentPayload: {
@@ -154,7 +164,7 @@ export async function settleCoffee(params: {
       network: n.caip2,
       payload: { signature: params.signature, authorization: params.authorization },
     },
-    paymentRequirements: requirements(params),
+    paymentRequirements: requirements(params, n),
   };
   const v = await callStack("verify", body);
   if (v.isValid !== true) {

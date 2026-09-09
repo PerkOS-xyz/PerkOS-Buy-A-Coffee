@@ -83,7 +83,7 @@ export default function Checkout(props: {
           if (code === 4902) {
             await w.provider.request({
               method: "wallet_addEthereumChain",
-              params: [{ chainId: hexChain, chainName: config.networkName, rpcUrls: [config.rpcUrl], nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 } }],
+              params: [{ chainId: hexChain, chainName: config.networkName, rpcUrls: [config.rpcUrl], nativeCurrency: { name: config.native.name, symbol: config.native.symbol, decimals: 18 }, blockExplorerUrls: [config.explorer] }],
             });
           } else throw e;
         }
@@ -107,7 +107,7 @@ export default function Checkout(props: {
       const prep = await fetch("/api/checkout/prepare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(props.handle ? { handle: props.handle, amount: effectiveAmount, memo, returnTo: props.returnTo, from: account } : { payTo: props.payTo, amount: effectiveAmount, memo, returnTo: props.returnTo, from: account }),
+        body: JSON.stringify(props.handle ? { handle: props.handle, amount: effectiveAmount, memo, returnTo: props.returnTo, from: account, network: config.network } : { payTo: props.payTo, amount: effectiveAmount, memo, returnTo: props.returnTo, from: account, network: config.network }),
       }).then((r) => r.json());
       if (!prep.ok) throw new Error(prep.error || "Could not prepare the payment");
 
@@ -132,7 +132,7 @@ export default function Checkout(props: {
         body: JSON.stringify(
           props.handle
             ? { coffeeId: prep.coffeeId, signature }
-            : { coffeeId: prep.coffeeId, signature, wallet: { payTo: props.payTo, from: account, amount: effectiveAmount, validBefore: prep.authorization.validBefore, memo, returnTo: props.returnTo } },
+            : { coffeeId: prep.coffeeId, signature, wallet: { payTo: props.payTo, from: account, amount: effectiveAmount, validBefore: prep.authorization.validBefore, memo, returnTo: props.returnTo, network: config.network } },
         ),
       }).then((r) => r.json());
       if (!res.ok) throw new Error(res.error || "Settlement failed");
@@ -172,8 +172,8 @@ export default function Checkout(props: {
         <div className="lbl">Thank you</div>
         <h2 style={{ marginTop: ".4rem" }}>Coffee delivered ☕</h2>
         <p className="dim">
-          {effectiveAmount} USDC sent to {who}.{" "}
-          {tx ? <a href={txLink(config.network, tx)} target="_blank" rel="noreferrer">View transaction</a> : null}
+          {effectiveAmount} {config.symbol} sent to {who} on {config.networkName}.{" "}
+          {tx ? <a href={`${config.explorer}/tx/${tx}`} target="_blank" rel="noreferrer">View transaction</a> : null}
         </p>
         {props.returnTo && props.returnAllowed ? (
           <p className="note">Taking you back…</p>
@@ -188,7 +188,23 @@ export default function Checkout(props: {
 
   return (
     <section className="card" style={{ marginTop: "1.5rem" }}>
-      <div className="lbl">Amount · USDC on {config.networkName}</div>
+      <div className="lbl">Amount · {config.symbol} on {config.networkName}</div>
+      {config.networks.length > 1 ? (
+        <p className="note" style={{ marginTop: ".2rem" }}>
+          Network:{" "}
+          <select
+            value={config.network}
+            onChange={(e) => {
+              const u = new URL(window.location.href);
+              u.searchParams.set("network", e.target.value);
+              window.location.href = u.toString();
+            }}
+            style={{ padding: ".2rem .4rem" }}
+          >
+            {config.networks.map((n) => <option key={n.key} value={n.key}>{n.name} · {n.symbol}</option>)}
+          </select>
+        </p>
+      ) : null}
       <div className="amounts">
         {presets.map((a) => (
           <button key={a} type="button" className={`amt ${!customAmount && amount === a ? "on" : ""}`} onClick={() => { setAmount(a); setCustomAmount(""); }}>
@@ -212,10 +228,10 @@ export default function Checkout(props: {
       <p className="note" style={{ marginTop: "1rem" }}>
         {amountOk ? (
           <>
-            {who} receives {(effectiveAmount - fee).toFixed(2)} USDC · {fee.toFixed(2)} USDC covers the facilitator&apos;s gas (2%). One signature, no gas for you.
+            {who} receives {(effectiveAmount - fee).toFixed(2)} {config.symbol} · {fee.toFixed(2)} {config.symbol} covers the facilitator&apos;s gas (2%). One signature, no gas for you.
           </>
         ) : (
-          <>Enter an amount between {config.minUsdc} and {config.maxUsdc} USDC.</>
+          <>Enter an amount between {config.minUsdc} and {config.maxUsdc} {config.symbol}.</>
         )}
       </p>
 
@@ -240,12 +256,12 @@ export default function Checkout(props: {
           </button>
           <button type="button" className="btn ghost" onClick={cancel}>Cancel</button>
           <span className="note">
-            {account.slice(0, 6)}…{account.slice(-4)} · {balance !== null ? `${Number(balance).toFixed(2)} USDC` : ""}
+            {account.slice(0, 6)}…{account.slice(-4)} · {balance !== null ? `${Number(balance).toFixed(2)} ${config.symbol}` : ""}
           </span>
         </div>
       )}
       {balance !== null && amountOk && Number(balance) < effectiveAmount ? (
-        <p className="msg err">Not enough USDC on {config.networkName}. {config.network === "base" ? <a href="https://www.coinbase.com/price/usd-coin" target="_blank" rel="noreferrer">Get USDC on Base</a> : <a href="https://faucet.circle.com/" target="_blank" rel="noreferrer">Get test USDC</a>}</p>
+        <p className="msg err">Not enough {config.symbol} on {config.networkName}.{config.network === "base-sepolia" ? <> <a href="https://faucet.circle.com/" target="_blank" rel="noreferrer">Get test USDC</a></> : null}</p>
       ) : null}
       {error ? <p className="msg err">{error}</p> : null}
     </section>
@@ -261,6 +277,3 @@ function safeHost(u: string): string | null {
   }
 }
 
-function txLink(network: string, tx: string) {
-  return network === "base" ? `https://basescan.org/tx/${tx}` : `https://sepolia.basescan.org/tx/${tx}`;
-}

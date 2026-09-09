@@ -28,7 +28,7 @@ export function BuyACoffee({ label, theme, className, onResult, ...link }: BuyAC
       return "#";
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [link.handle, link.wallet, link.name, link.amount, link.memo, link.returnTo, link.baseUrl]);
+  }, [link.handle, link.wallet, link.name, link.amount, link.memo, link.network, link.returnTo, link.baseUrl]);
 
   return (
     <a
