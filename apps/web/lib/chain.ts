@@ -11,7 +11,7 @@ export const COFFEE_EVENT = parseAbiItem(
 /** First block to scan per network (contract deployment). */
 const FROM_BLOCK: Record<string, bigint> = {
   "base-sepolia": 46_581_089n,
-  base: 0n,
+  base: 51_103_530n,
 };
 
 export interface ChainCoffee {
