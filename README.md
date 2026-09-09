@@ -53,9 +53,22 @@ npm run dev
 
 ## Deploy (Vercel)
 
-Root directory `apps/web`, build command `npm run build` from the repo root (builds the widget first). Env: see `apps/web/.env.example`. Database: Neon; run `npm run db:migrate -w apps/web` with `DATABASE_URL` once per environment.
+Project `zknexus/buyacoffee` (root `apps/web`, linked to this repo, production branch `main`). Domain `buyacoffee.perkos.xyz` is added to the project; DNS lives in Route 53 for `perkos.xyz`:
 
-Stack side: `COFFEE_SPLIT_ADDRESS_<NETWORK>` set on the facilitator, a `domain_whitelist` sponsor rule for `buyacoffee.perkos.xyz`, and an API key (`PERKOS_STACK_API_KEY` here) whose verified vendor domain is `buyacoffee.perkos.xyz`.
+```
+buyacoffee.perkos.xyz.  CNAME  95763684bb574e41.vercel-dns-016.com.   (or cname.vercel-dns.com.)
+```
+
+Env already set (production, preview, development): `APP_URL`, `NETWORK=base-sepolia`, `COFFEE_SPLIT_ADDRESS`, `RPC_URL`, `PERKOS_STACK_URL`, `SESSION_SECRET`.
+
+Still needed before the first coffee:
+
+1. **Database**: create a Neon Postgres (Vercel Marketplace → Neon, or neon.tech), set `DATABASE_URL` on the project, then run `DATABASE_URL=… npm run db:migrate -w apps/web` once.
+2. **Email**: set `RESEND_API_KEY` (the key on juliomcruz-xyz is a sensitive var and cannot be copied) and a `FROM_EMAIL` on a domain verified in Resend (e.g. `Buy A Coffee <coffee@perkos.xyz>` once `perkos.xyz` is verified there).
+3. **Stack** (facilitator): merge PerkOS-xyz/Stack PR #147; `COFFEE_SPLIT_ADDRESS_BASE_SEPOLIA` is already set on the `stack` project. In the Stack dashboard create an API key, claim and verify the vendor domain `buyacoffee.perkos.xyz`, and add a `domain_whitelist` sponsor rule for it pointing at a funded sponsor wallet on Base Sepolia. Set that key here as `PERKOS_STACK_API_KEY`.
+4. **DNS**: the CNAME above.
+
+Build: `npm run build` from the repo root (builds the widget first, then Next). Env reference: `apps/web/.env.example`.
 
 ## Not in v1
 

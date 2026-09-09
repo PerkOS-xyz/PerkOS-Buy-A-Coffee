@@ -5,7 +5,13 @@ import { publicConfig } from "@/lib/config";
 /** Public creator profile, read by the widget and by agents. */
 export async function GET(_req: Request, ctx: { params: Promise<{ handle: string }> }) {
   const { handle } = await ctx.params;
-  const c = await getCreatorByHandle(handle);
+  let c;
+  try {
+    c = await getCreatorByHandle(handle);
+  } catch (e) {
+    console.error("creators: db unavailable", (e as Error).message);
+    return NextResponse.json({ error: "service not configured" }, { status: 503 });
+  }
   if (!c || !c.active || !c.handle || !c.pay_to) return NextResponse.json({ error: "not found" }, { status: 404 });
   const stats = await countSettled(c.id);
   const cfg = publicConfig();
