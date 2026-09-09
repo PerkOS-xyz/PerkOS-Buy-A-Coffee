@@ -88,6 +88,15 @@ Build: `npm run build` from the repo root (builds the widget first, then Next). 
 
 Other networks and tokens, WalletConnect (injected wallets only), recurring coffees, embedded (non-redirect) checkout, fiat.
 
+## Contracts
+
+| Network | CoffeeSplit proxy | From block |
+|---|---|---|
+| Base mainnet | `0xf8aaa69ef77d91dd4419d883252d3d0f0fd09d90` | 51103530 |
+| Base Sepolia | `0x704F85Bca00617096fa4F3d5C5499Ff373Fd5d38` | 46581089 |
+
+Both verified on Basescan. `NETWORK=base` selects mainnet; `COFFEE_SPLIT_ADDRESS` and `COFFEE_SPLIT_FROM_BLOCK` override the defaults.
+
 ## Operations
 
 - **Gas.** Stack settles every coffee from the PerkOS sponsor wallet (`SPONSOR_WALLET_ADDRESS`). `GET /api/health` reports its balance on the configured network and flags `sponsorLow` under `SPONSOR_LOW_ETH`; the daily Vercel cron (`vercel.json`) calls it with `?alert=1`, which posts to `ALERT_WEBHOOK_URL` (Slack/Discord-style JSON with `text`) when low. Refill from the treasury: the 2% fee arrives in USDC, gas is paid in ETH.

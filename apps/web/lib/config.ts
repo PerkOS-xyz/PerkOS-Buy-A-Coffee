@@ -33,19 +33,16 @@ const KNOWN: Record<NetworkKey, Omit<NetworkConfig, "coffeeSplit" | "rpcUrl">> =
   },
 };
 
-function need(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing env ${name}`);
-  return v;
-}
-
 export function getNetwork(): NetworkConfig {
   const key = (process.env.NETWORK || "base-sepolia") as NetworkKey;
   const base = KNOWN[key];
   if (!base) throw new Error(`Unsupported NETWORK ${key}`);
-  // Base Sepolia has a known deployment; mainnet must be configured explicitly.
-  const coffeeSplit = (process.env.COFFEE_SPLIT_ADDRESS ||
-    (key === "base-sepolia" ? "0x704F85Bca00617096fa4F3d5C5499Ff373Fd5d38" : need("COFFEE_SPLIT_ADDRESS"))) as Address;
+  // Known deployments (both verified on Basescan); COFFEE_SPLIT_ADDRESS overrides.
+  const KNOWN_SPLIT: Record<NetworkKey, Address> = {
+    "base-sepolia": "0x704F85Bca00617096fa4F3d5C5499Ff373Fd5d38",
+    base: "0xf8aaa69ef77d91dd4419d883252d3d0f0fd09d90",
+  };
+  const coffeeSplit = (process.env.COFFEE_SPLIT_ADDRESS || KNOWN_SPLIT[key]) as Address;
   const rpcUrl =
     process.env.RPC_URL || (key === "base" ? "https://mainnet.base.org" : "https://sepolia.base.org");
   return { ...base, coffeeSplit, rpcUrl };
