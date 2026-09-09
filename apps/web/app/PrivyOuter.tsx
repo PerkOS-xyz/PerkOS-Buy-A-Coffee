@@ -14,7 +14,8 @@ export function PrivyOuter({ children }: { children: ReactNode }) {
       clientId={CLIENT_ID || undefined}
       config={{
         loginMethodsAndOrder: {
-          primary: ["metamask", "coinbase_wallet", "base_account", "detected_ethereum_wallets", "wallet_connect_qr"],
+          primary: ["metamask", "coinbase_wallet", "base_account", "wallet_connect_qr"],
+          overflow: ["detected_ethereum_wallets"],
         },
         supportedChains: [base, baseSepolia],
         defaultChain: process.env.NEXT_PUBLIC_NETWORK === "base" ? base : baseSepolia,
