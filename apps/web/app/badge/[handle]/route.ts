@@ -4,8 +4,14 @@ import { countSettled, getCreatorByHandle } from "@/lib/db";
 export async function GET(_req: Request, ctx: { params: Promise<{ handle: string }> }) {
   const raw = (await ctx.params).handle;
   const handle = raw.replace(/\.svg$/i, "");
-  const c = await getCreatorByHandle(handle);
-  const count = c ? (await countSettled(c.id)).count : 0;
+  let c = null;
+  let count = 0;
+  try {
+    c = await getCreatorByHandle(handle);
+    if (c) count = (await countSettled(c.id)).count;
+  } catch (e) {
+    console.error("badge: db unavailable", (e as Error).message);
+  }
   const label = "Buy me an x402 coffee";
   const right = c ? (count > 0 ? `☕ ${count}` : "☕ USDC") : "not found";
   const lw = 10 + label.length * 6.6;
