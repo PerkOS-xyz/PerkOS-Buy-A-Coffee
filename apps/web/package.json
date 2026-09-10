@@ -10,10 +10,10 @@
     "start": "next start -p 3407",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
-    "db:migrate": "node scripts/migrate.mjs"
+    "db:seed": "node scripts/seed.mjs"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.0.1",
+    "firebase-admin": "^13.6.0",
     "jose": "^6.2.4",
     "next": "15.2.8",
     "react": "^19.0.0",

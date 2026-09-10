@@ -47,14 +47,21 @@ export async function PUT(req: Request) {
   }
   const origins = b.allowedOrigins?.map(normalizeOrigin).filter((o): o is string => !!o);
 
-  const updated = await updateCreator(me.id, {
-    handle,
-    pay_to: (b.payTo ?? me.pay_to ?? wallet).toLowerCase(),
-    display_name: b.displayName,
-    avatar_url: b.avatarUrl === "" ? null : b.avatarUrl,
-    message: b.message,
-    default_amounts: b.amounts,
-    allowed_origins: origins,
-  });
+  let updated;
+  try {
+    updated = await updateCreator(me.id, {
+      handle,
+      pay_to: (b.payTo ?? me.pay_to ?? wallet).toLowerCase(),
+      display_name: b.displayName,
+      avatar_url: b.avatarUrl === "" ? null : b.avatarUrl,
+      message: b.message,
+      default_amounts: b.amounts,
+      allowed_origins: origins,
+    });
+  } catch (e) {
+    // The write re-checks the handle inside a transaction; a race with another wallet lands here.
+    if ((e as Error).message === "handle taken") return NextResponse.json({ error: "That handle is taken" }, { status: 409 });
+    throw e;
+  }
   return NextResponse.json({ creator: updated });
 }
