@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 async function fresh(env) {
-  for (const k of Object.keys(process.env)) if (/^(NETWORK|NETWORKS|COFFEE_SPLIT_|RPC_URL)/.test(k)) delete process.env[k];
+  for (const k of Object.keys(process.env)) if (/^(NETWORK|NETWORKS|COFFEE_SPLIT_|RPC_URL|LOG_CHUNK_)/.test(k)) delete process.env[k];
   Object.assign(process.env, env);
   return import(`../lib/config.ts?${Math.random()}`);
 }
@@ -42,4 +42,15 @@ test("publicConfig carries the symbol, native currency and the switchable list",
   assert.equal(p.native.symbol, "ETH");
   assert.deepEqual(p.networks.map((n) => n.key), ["base", "base-sepolia"]);
   assert.equal(p.explorer, "https://sepolia.basescan.org");
+});
+
+test("each network carries the getLogs window its public RPC accepts; env overrides it", async () => {
+  const c = await fresh({ NETWORK: "base", NETWORKS: "base-sepolia,celo,robinhood", COFFEE_SPLIT_ADDRESS_CELO: "0x" + "11".repeat(20), COFFEE_SPLIT_ADDRESS_ROBINHOOD: "0x" + "22".repeat(20) });
+  assert.equal(c.getNetwork("base").logChunk, 2000n, "Base public RPC refuses more than 2,000 blocks");
+  assert.equal(c.getNetwork("celo").logChunk, 4999n);
+  assert.ok(c.getNetwork("base-sepolia").logChunk <= 10_000n);
+  assert.ok(c.getNetwork("robinhood").logChunk >= 9000n);
+  const c2 = await fresh({ NETWORK: "base", NETWORKS: "base-sepolia", LOG_CHUNK_BASE: "10000", LOG_CHUNK_BASE_SEPOLIA: "nope" });
+  assert.equal(c2.getNetwork("base").logChunk, 10_000n);
+  assert.equal(c2.getNetwork("base-sepolia").logChunk, 9000n, "an invalid override falls back to the known cap");
 });

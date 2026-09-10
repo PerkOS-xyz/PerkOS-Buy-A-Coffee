@@ -94,10 +94,13 @@ Other networks and tokens, WalletConnect (injected wallets only), recurring coff
 |---|---|---|
 | Base mainnet | `0xf8aaa69ef77d91dd4419d883252d3d0f0fd09d90` | 51103530 |
 | Base Sepolia | `0x704F85Bca00617096fa4F3d5C5499Ff373Fd5d38` | 46581089 |
+| Celo | `0xc484c85fda99e26f8b98c2835414eb96b4e4aae5` | 77162466 |
+| Robinhood Chain | `0x4f11f4b17c257f8c36372954944b6038fc324252` | 59603132 |
 
-Both verified on Basescan. `NETWORK=base` selects mainnet; `COFFEE_SPLIT_ADDRESS` and `COFFEE_SPLIT_FROM_BLOCK` override the defaults.
+Base and Base Sepolia are built in and verified on Basescan; Celo (verified on Celoscan) and Robinhood (verified via Sourcify, USDG instead of USDC) are enabled by `COFFEE_SPLIT_ADDRESS_<KEY>` + `COFFEE_SPLIT_FROM_BLOCK_<KEY>` and `NETWORKS`. `NETWORK=base` selects the default; `COFFEE_SPLIT_ADDRESS` and `COFFEE_SPLIT_FROM_BLOCK` still override it.
 
 ## Operations
 
 - **Gas.** Stack settles every coffee from the PerkOS sponsor wallet (`SPONSOR_WALLET_ADDRESS`). `GET /api/health` reports its balance on the configured network and flags `sponsorLow` under `SPONSOR_LOW_ETH`; the daily Vercel cron (`vercel.json`) calls it with `?alert=1`, which posts to `ALERT_WEBHOOK_URL` (Slack/Discord-style JSON with `text`) when low. Refill from the treasury: the 2% fee arrives in USDC, gas is paid in ETH.
+- **Coffee index.** Dashboards, badges and `/api/me/coffees` read `Coffee` events straight from each network, cached in memory per instance and fetched incrementally after the first scan (`lib/chain.ts`). Public RPCs cap one `eth_getLogs` call (Base 2,000 blocks, Celo 5,000, Base Sepolia 10,000); the scanner uses the network's known window (`LOG_CHUNK_<KEY>` overrides) and halves it when refused. `GET /api/health` reports `scan` per network (`ok`, `coffees`, `scannedTo`, `error`) and the cron alerts when a scan fails, because a failed scan hides that network's coffees. A cold instance still walks from the deployment block, so the next step as history grows is a database-backed index.
 - **Rate limits.** `POST /api/checkout/prepare` and `POST /api/checkout/settle` are limited per IP and per payer wallet (see `lib/rateLimit.ts`; settle is tighter because it spends sponsor gas). In-memory per instance; promote to a database-backed limiter if abuse shows up.

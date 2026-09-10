@@ -22,7 +22,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ handle: string
     message: c.message,
     amounts: c.default_amounts,
     network: cfg.caip2,
-    token: "USDC",
+    token: cfg.symbol,
+    /** Every network this creator can be paid on; the widget's `network` option picks one. */
+    networks: cfg.networks.map((n) => ({ key: n.key, name: n.name, token: n.symbol })),
     checkoutUrl: `${cfg.appUrl}/${c.handle}`,
     badgeUrl: `${cfg.appUrl}/badge/${c.handle}.svg`,
     coffees: stats.count,
