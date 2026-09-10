@@ -23,9 +23,11 @@ export interface NetworkConfig {
   coffeeSplit: Address;
   /** First block to scan for Coffee events (the split deployment block). */
   fromBlock: bigint;
+  /** Blocks per eth_getLogs call the network's RPC accepts (see lib/logWindows.ts); the scanner halves it when refused. */
+  logChunk: bigint;
 }
 
-type Known = Omit<NetworkConfig, "rpcUrl" | "coffeeSplit" | "fromBlock"> & { defaultRpc: string };
+type Known = Omit<NetworkConfig, "rpcUrl" | "coffeeSplit" | "fromBlock" | "logChunk"> & { defaultRpc: string };
 
 const KNOWN: Record<NetworkKey, Known> = {
   base: {
@@ -63,6 +65,20 @@ const KNOWN_FROM_BLOCK: Partial<Record<NetworkKey, bigint>> = {
   "base-sepolia": 46_581_089n,
 };
 
+/**
+ * eth_getLogs block-range caps of the default public RPCs, measured 2026-09-10
+ * (Base 2,000; Base Sepolia 10,000; Celo forno 5,000; Robinhood none seen).
+ * Env `LOG_CHUNK_<KEY>` overrides, for example when RPC_URL_<KEY> points at a
+ * provider with a different cap. Too big is safe (the scanner halves on
+ * refusal); too small only costs calls.
+ */
+const KNOWN_LOG_CHUNK: Record<NetworkKey, bigint> = {
+  base: 2_000n,
+  "base-sepolia": 9_000n,
+  celo: 4_999n,
+  robinhood: 50_000n,
+};
+
 export const DEFAULT_NETWORK = (process.env.NETWORK || "base") as NetworkKey;
 
 const envKey = (key: NetworkKey) => key.toUpperCase().replace(/-/g, "_");
@@ -80,6 +96,12 @@ function fromBlock(key: NetworkKey): bigint {
   if (specific) return BigInt(specific);
   if (key === DEFAULT_NETWORK && process.env.COFFEE_SPLIT_FROM_BLOCK) return BigInt(process.env.COFFEE_SPLIT_FROM_BLOCK);
   return KNOWN_FROM_BLOCK[key] ?? 0n;
+}
+
+function logChunk(key: NetworkKey): bigint {
+  const specific = process.env[`LOG_CHUNK_${envKey(key)}`];
+  if (specific && /^\d+$/.test(specific) && BigInt(specific) > 0n) return BigInt(specific);
+  return KNOWN_LOG_CHUNK[key];
 }
 
 function rpcUrl(key: NetworkKey): string {
@@ -109,7 +131,7 @@ function build(key: NetworkKey): NetworkConfig {
   if (!coffeeSplit) throw new Error(`Network ${key} has no CoffeeSplit address`);
   const { defaultRpc: _drop, ...rest } = known;
   void _drop;
-  return { ...rest, rpcUrl: rpcUrl(key), coffeeSplit, fromBlock: fromBlock(key) };
+  return { ...rest, rpcUrl: rpcUrl(key), coffeeSplit, fromBlock: fromBlock(key), logChunk: logChunk(key) };
 }
 
 /** The network for a request; throws when it is unknown or not enabled. */
