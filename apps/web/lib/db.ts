@@ -1,6 +1,7 @@
-// Firestore, through the Admin SDK with the same service account Stack and
-// the PerkOS API use (env FIREBASE_SERVICE_ACCOUNT, a JSON string). Without
-// it every call throws and the routes fall back to wallet mode, exactly as
+// Firestore, through the Admin SDK, in Buy A Coffee's own Firebase project
+// (perkos-coffee). Credentials come from FIREBASE_SERVICE_ACCOUNT (one-line
+// JSON) or the split FIREBASE_PROJECT_ID / CLIENT_EMAIL / PRIVATE_KEY. Without
+// them every call throws and the routes fall back to wallet mode, exactly as
 // they did without DATABASE_URL. Shapes and pure conversions: lib/dbShape.ts.
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore, type Firestore, type Transaction } from "firebase-admin/firestore";

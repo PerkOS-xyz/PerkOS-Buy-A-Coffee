@@ -2,8 +2,8 @@
  * Shapes of the two Firestore collections and the pure conversions around
  * them. No Firebase here, so this is unit-tested without credentials.
  *
- * Collections (prefixed, because the Firebase project is shared with Stack
- * and the PerkOS API):
+ * Collections (prefixed, so the data stays recognisable if the project is
+ * ever shared with another PerkOS service):
  *   buyacoffee_creators  one document per creator, id = wallet (lowercase)
  *   buyacoffee_coffees   one document per checkout attempt, id = coffee_id
  */
