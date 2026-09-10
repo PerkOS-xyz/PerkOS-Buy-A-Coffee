@@ -1,105 +1,77 @@
-// Neon Postgres over HTTP. Small typed query helpers instead of an ORM: the
-// schema is three tables and every query is a few lines.
-import { neon } from "@neondatabase/serverless";
+// Firestore, through the Admin SDK, in Buy A Coffee's own Firebase project
+// (perkos-coffee). Credentials come from FIREBASE_SERVICE_ACCOUNT (one-line
+// JSON) or the split FIREBASE_PROJECT_ID / CLIENT_EMAIL / PRIVATE_KEY. Without
+// them every call throws and the routes fall back to wallet mode, exactly as
+// they did without DATABASE_URL. Shapes and pure conversions: lib/dbShape.ts.
+import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
+import { getFirestore, type Firestore, type Transaction } from "firebase-admin/firestore";
+import { COFFEES, CREATORS, creatorUpdate, parseServiceAccount, sumAmounts, toCoffee, toCreator, type Coffee, type Creator, type CreatorPatch } from "./dbShape";
 
-export interface Creator {
-  id: string;
-  email: string | null;
-  wallet: string | null;
-  handle: string | null;
-  pay_to: string | null;
-  display_name: string | null;
-  avatar_url: string | null;
-  message: string | null;
-  default_amounts: number[];
-  allowed_origins: string[];
-  active: boolean;
-  created_at: string;
-  updated_at: string;
-}
+export { HANDLE_RE, RESERVED_HANDLES, type Coffee, type Creator } from "./dbShape";
 
-export interface Coffee {
-  id: string;
-  coffee_id: string;
-  creator_id: string | null;
-  pay_to: string | null;
-  network: string;
-  amount: string;
-  fee: string | null;
-  from_address: string | null;
-  tx_hash: string | null;
-  status: "pending" | "settled" | "failed";
-  memo: string | null;
-  return_to: string | null;
-  error: string | null;
-  created_at: string;
-  settled_at: string | null;
-}
+let app: App | null = null;
+let firestore: Firestore | null = null;
 
-let client: ReturnType<typeof neon> | null = null;
-export function sql() {
-  if (!client) {
-    const url = process.env.DATABASE_URL;
-    if (!url) throw new Error("DATABASE_URL is not set");
-    client = neon(url);
+export function db(): Firestore {
+  if (!firestore) {
+    const sa = parseServiceAccount(process.env);
+    if (!sa) throw new Error("Firebase credentials are not set (FIREBASE_SERVICE_ACCOUNT or FIREBASE_PROJECT_ID/CLIENT_EMAIL/PRIVATE_KEY)");
+    if (!app) app = getApps()[0] ?? initializeApp({ credential: cert(sa), projectId: sa.projectId });
+    firestore = getFirestore(app);
   }
-  return client;
+  return firestore;
 }
 
-export const HANDLE_RE = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])?$/;
-export const RESERVED_HANDLES = new Set([
-  "api", "badge", "dashboard", "login", "logout", "widget.js", "widget", "docs", "about", "admin",
-  "perkos", "coffee", "static", "_next", "favicon.ico", "robots.txt", "sitemap.xml", "llms.txt",
-]);
+const now = () => new Date().toISOString();
+const creators = () => db().collection(CREATORS);
+const coffees = () => db().collection(COFFEES);
 
-export async function getCreatorByHandle(handle: string): Promise<Creator | null> {
-  const rows = (await sql()`SELECT * FROM creators WHERE handle = ${handle.toLowerCase()} LIMIT 1`) as Creator[];
-  return rows[0] ?? null;
+async function firstCreator(field: string, value: string): Promise<Creator | null> {
+  const snap = await creators().where(field, "==", value).limit(1).get();
+  const d = snap.docs[0];
+  return d ? toCreator(d.id, d.data()) : null;
 }
 
-export async function getCreatorByEmail(email: string): Promise<Creator | null> {
-  const rows = (await sql()`SELECT * FROM creators WHERE email = ${email.toLowerCase()} LIMIT 1`) as Creator[];
-  return rows[0] ?? null;
+export function getCreatorByHandle(handle: string) {
+  return firstCreator("handle", handle.toLowerCase());
 }
-
+export function getCreatorByEmail(email: string) {
+  return firstCreator("email", email.toLowerCase());
+}
+export function getCreatorByWallet(wallet: string) {
+  return getCreatorById(wallet.toLowerCase());
+}
 export async function getCreatorById(id: string): Promise<Creator | null> {
-  const rows = (await sql()`SELECT * FROM creators WHERE id = ${id} LIMIT 1`) as Creator[];
-  return rows[0] ?? null;
+  const d = await creators().doc(id).get();
+  return d.exists ? toCreator(d.id, d.data() ?? {}) : null;
 }
 
-export async function getCreatorByWallet(wallet: string): Promise<Creator | null> {
-  const rows = (await sql()`SELECT * FROM creators WHERE wallet = ${wallet.toLowerCase()} LIMIT 1`) as Creator[];
-  return rows[0] ?? null;
-}
-
-/** Creates the profile row for a wallet on first sign-in; pay_to defaults to the wallet itself. */
+/** Creates the profile for a wallet on first sign-in; pay_to defaults to the wallet itself. */
 export async function upsertCreatorByWallet(wallet: string): Promise<Creator> {
   const w = wallet.toLowerCase();
-  const rows = (await sql()`
-    INSERT INTO creators (wallet, pay_to) VALUES (${w}, ${w})
-    ON CONFLICT (wallet) DO UPDATE SET updated_at = now()
-    RETURNING *`) as Creator[];
-  return rows[0];
+  const ref = creators().doc(w);
+  const t = now();
+  await db().runTransaction(async (tx: Transaction) => {
+    const cur = await tx.get(ref);
+    if (cur.exists) tx.update(ref, { updated_at: t });
+    else tx.set(ref, { wallet: w, pay_to: w, email: null, handle: null, active: true, created_at: t, updated_at: t });
+  });
+  return (await getCreatorById(w)) as Creator;
 }
 
-export async function updateCreator(
-  id: string,
-  patch: Partial<Pick<Creator, "handle" | "pay_to" | "display_name" | "avatar_url" | "message" | "default_amounts" | "allowed_origins" | "active">>,
-): Promise<Creator> {
-  const rows = (await sql()`
-    UPDATE creators SET
-      handle = COALESCE(${patch.handle ?? null}, handle),
-      pay_to = COALESCE(${patch.pay_to ?? null}, pay_to),
-      display_name = COALESCE(${patch.display_name ?? null}, display_name),
-      avatar_url = COALESCE(${patch.avatar_url ?? null}, avatar_url),
-      message = COALESCE(${patch.message ?? null}, message),
-      default_amounts = COALESCE(${patch.default_amounts ? JSON.stringify(patch.default_amounts) : null}::jsonb, default_amounts),
-      allowed_origins = COALESCE(${patch.allowed_origins ? JSON.stringify(patch.allowed_origins) : null}::jsonb, allowed_origins),
-      active = COALESCE(${patch.active ?? null}, active),
-      updated_at = now()
-    WHERE id = ${id}
-    RETURNING *`) as Creator[];
-  return rows[0];
+/** Handles are unique: a change is checked and written in one transaction. */
+export async function updateCreator(id: string, patch: CreatorPatch): Promise<Creator> {
+  const ref = creators().doc(id);
+  const update = creatorUpdate(patch, now());
+  await db().runTransaction(async (tx: Transaction) => {
+    if (typeof patch.handle === "string") {
+      const clash = await tx.get(creators().where("handle", "==", patch.handle).limit(1));
+      const other = clash.docs.find((d) => d.id !== id);
+      if (other) throw new Error("handle taken");
+    }
+    tx.update(ref, update);
+  });
+  return (await getCreatorById(id)) as Creator;
 }
 
 export async function insertCoffee(c: {
@@ -112,51 +84,69 @@ export async function insertCoffee(c: {
   return_to: string | null;
   from_address: string | null;
 }): Promise<Coffee> {
-  const rows = (await sql()`
-    INSERT INTO coffees (coffee_id, creator_id, pay_to, network, amount, memo, return_to, from_address)
-    VALUES (${c.coffee_id}, ${c.creator_id}, ${c.pay_to.toLowerCase()}, ${c.network}, ${c.amount}, ${c.memo}, ${c.return_to}, ${c.from_address})
-    ON CONFLICT (coffee_id) DO UPDATE SET from_address = COALESCE(EXCLUDED.from_address, coffees.from_address)
-    RETURNING *`) as Coffee[];
-  return rows[0];
+  const ref = coffees().doc(c.coffee_id);
+  await db().runTransaction(async (tx: Transaction) => {
+    const cur = await tx.get(ref);
+    if (cur.exists) {
+      // Same attempt prepared twice: keep the row, fill the payer if it was unknown.
+      if (c.from_address && !cur.data()?.from_address) tx.update(ref, { from_address: c.from_address });
+      return;
+    }
+    tx.set(ref, {
+      coffee_id: c.coffee_id,
+      creator_id: c.creator_id,
+      pay_to: c.pay_to.toLowerCase(),
+      network: c.network,
+      amount: Number(c.amount),
+      fee: null,
+      from_address: c.from_address,
+      tx_hash: null,
+      status: "pending",
+      memo: c.memo,
+      return_to: c.return_to,
+      error: null,
+      created_at: now(),
+      settled_at: null,
+    });
+  });
+  return (await getCoffee(c.coffee_id)) as Coffee;
 }
 
 export async function getCoffee(coffeeId: string): Promise<Coffee | null> {
-  const rows = (await sql()`SELECT * FROM coffees WHERE coffee_id = ${coffeeId} LIMIT 1`) as Coffee[];
-  return rows[0] ?? null;
+  const d = await coffees().doc(coffeeId).get();
+  return d.exists ? toCoffee(d.id, d.data() ?? {}) : null;
 }
 
 export async function markCoffee(
   coffeeId: string,
   patch: { status: Coffee["status"]; tx_hash?: string | null; fee?: string | null; error?: string | null; from_address?: string | null },
 ): Promise<Coffee> {
-  const rows = (await sql()`
-    UPDATE coffees SET
-      status = ${patch.status},
-      tx_hash = COALESCE(${patch.tx_hash ?? null}, tx_hash),
-      fee = COALESCE(${patch.fee ?? null}, fee),
-      error = ${patch.error ?? null},
-      from_address = COALESCE(${patch.from_address ?? null}, from_address),
-      settled_at = CASE WHEN ${patch.status} = 'settled' THEN now() ELSE settled_at END
-    WHERE coffee_id = ${coffeeId}
-    RETURNING *`) as Coffee[];
-  return rows[0];
+  const update: Record<string, unknown> = { status: patch.status, error: patch.error ?? null };
+  if (patch.tx_hash) update.tx_hash = patch.tx_hash;
+  if (patch.fee) update.fee = Number(patch.fee);
+  if (patch.from_address) update.from_address = patch.from_address;
+  if (patch.status === "settled") update.settled_at = now();
+  await coffees().doc(coffeeId).update(update);
+  return (await getCoffee(coffeeId)) as Coffee;
 }
 
 export async function listCoffees(creatorId: string, limit = 50): Promise<Coffee[]> {
-  return (await sql()`
-    SELECT * FROM coffees WHERE creator_id = ${creatorId} ORDER BY created_at DESC LIMIT ${limit}`) as Coffee[];
+  // Equality filter only (no composite index); ordered here.
+  const snap = await coffees().where("creator_id", "==", creatorId).get();
+  return snap.docs
+    .map((d) => toCoffee(d.id, d.data()))
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, limit);
 }
 
-export async function countSettled(creatorId: string): Promise<{ count: number; total: string }> {
-  const rows = (await sql()`
-    SELECT count(*)::int AS count, COALESCE(sum(amount), 0)::text AS total
-    FROM coffees WHERE creator_id = ${creatorId} AND status = 'settled'`) as { count: number; total: string }[];
-  return rows[0] ?? { count: 0, total: "0" };
+async function settledTotals(field: "creator_id" | "pay_to", value: string): Promise<{ count: number; total: string }> {
+  const snap = await coffees().where(field, "==", value).where("status", "==", "settled").select("amount").get();
+  return { count: snap.size, total: sumAmounts(snap.docs.map((d) => d.get("amount") ?? 0)) };
 }
 
-export async function countSettledByWallet(payTo: string): Promise<{ count: number; total: string }> {
-  const rows = (await sql()`
-    SELECT count(*)::int AS count, COALESCE(sum(amount), 0)::text AS total
-    FROM coffees WHERE pay_to = ${payTo.toLowerCase()} AND status = 'settled'`) as { count: number; total: string }[];
-  return rows[0] ?? { count: 0, total: "0" };
+export function countSettled(creatorId: string) {
+  return settledTotals("creator_id", creatorId);
+}
+export function countSettledByWallet(payTo: string) {
+  return settledTotals("pay_to", payTo.toLowerCase());
 }

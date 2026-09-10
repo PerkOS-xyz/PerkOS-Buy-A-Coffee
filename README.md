@@ -8,7 +8,7 @@ Design: `BUY-A-COFFEE-DESIGN.md` in the PerkOS workspace. Contract: [PerkOS-Cont
 
 | Path | What |
 |---|---|
-| `apps/web` | Next.js 15 service: checkout `/pay?to=…` and `/{handle}`, badge `/badge/{wallet-or-handle}.svg`, wallet dashboard, API. Privy wallet sign-in, viem, Neon Postgres (optional). |
+| `apps/web` | Next.js 15 service: checkout `/pay?to=…` and `/{handle}`, badge `/badge/{wallet-or-handle}.svg`, wallet dashboard, API. Privy wallet sign-in, viem, Firestore (optional). |
 | `packages/widget` | `@perkos/buy-a-coffee`: script tag, React component, `createCoffeeLink()`. No web3 dependencies. |
 
 ## Use it on a site
@@ -57,8 +57,8 @@ Sign in with a wallet (Privy) and the dashboard lists coffees **received** (`Cof
 
 ```bash
 npm install
-cp apps/web/.env.example apps/web/.env   # SESSION_SECRET required; DATABASE_URL and NEXT_PUBLIC_PRIVY_APP_ID optional locally
-npm run db:migrate -w apps/web
+cp apps/web/.env.example apps/web/.env   # SESSION_SECRET required; FIREBASE_SERVICE_ACCOUNT and NEXT_PUBLIC_PRIVY_APP_ID optional locally
+npm run db:seed -w apps/web              # only with FIREBASE_SERVICE_ACCOUNT: creates/refreshes the first creator
 npm run build -w packages/widget
 npm run dev
 ```
@@ -77,7 +77,7 @@ Env already set (production, preview, development): `APP_URL`, `NETWORK=base-sep
 
 Still needed before the first coffee:
 
-1. **Database**: create a Neon Postgres (Vercel Marketplace → Neon, or neon.tech), set `DATABASE_URL` on the project, then run `DATABASE_URL=… npm run db:migrate -w apps/web` once. The migrations also seed the first creator, `juliomcruz` (pay-to `0xc2564e41B7F5Cb66d2d99466450CfebcE9e8228f`, allowed origins juliomcruz.xyz and github.com).
+1. **Database**: Firestore in the Firebase project `perkos-coffee` (Native mode; client access denied by rules, the Admin SDK writes). Set `FIREBASE_SERVICE_ACCOUNT` (one-line JSON) or `FIREBASE_PROJECT_ID` + `FIREBASE_CLIENT_EMAIL` + `FIREBASE_PRIVATE_KEY` on the Vercel project, then run `npm run db:seed -w apps/web` once with it in `apps/web/.env`. `firestore.rules` (repo root) denies all client access; deploy it once with the Firebase CLI or paste it in the console. Collections are `buyacoffee_creators` (id = wallet) and `buyacoffee_coffees` (id = coffee id); queries use equality filters only, so no composite indexes are needed. The seed creates the first creator, `juliomcruz` (pay-to `0xc2564e41B7F5Cb66d2d99466450CfebcE9e8228f`, allowed origins juliomcruz.xyz and github.com). Without the variable the service runs in wallet mode: payments, badges by address and health work; handles, profiles and memos do not.
 2. **Sign-in**: `NEXT_PUBLIC_PRIVY_APP_ID` (the PerkOS Privy app is reused) and `https://buyacoffee.perkos.xyz` added to that app's allowed origins in the Privy dashboard. Sessions are proven by a signed challenge (`/api/auth/challenge` → `/api/auth/wallet`); no Privy server secret.
 3. **Stack** (facilitator): merge PerkOS-xyz/Stack PR #147; `COFFEE_SPLIT_ADDRESS_BASE_SEPOLIA` is already set on the `stack` project. In the Stack dashboard create an API key, claim and verify the vendor domain `buyacoffee.perkos.xyz`, and add a `domain_whitelist` sponsor rule for it pointing at a funded sponsor wallet on Base Sepolia. Set that key here as `PERKOS_STACK_API_KEY`.
 4. **DNS**: the CNAME above.

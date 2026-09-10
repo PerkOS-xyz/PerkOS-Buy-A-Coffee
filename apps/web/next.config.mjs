@@ -2,6 +2,8 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // The Admin SDK ships native/gRPC bits; keep it out of the server bundle.
+  serverExternalPackages: ["firebase-admin"],
   async headers() {
     return [
       {
